@@ -1,0 +1,5 @@
+build/
+stm32/build/
+llvm/build
+*.ll
+*.ll.ll
