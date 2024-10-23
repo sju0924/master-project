@@ -2,39 +2,46 @@
 #include "llvm/Passes/PassBuilder.h" // PassBuilder 정의
 #include "llvm/IR/Function.h"
 #include "llvm/Support/raw_ostream.h"
-#include "cmsis_armcc.h"
+#include "llvm/IR/PassManager.h" 
+#include "llvm/IR/Module.h"  
+#include "llvm/IR/IRBuilder.h" 
 
-#ifdef STM32_ENV
-#include "stm32l5xx_hal.h"
-#include "system_stm32l5xx.h"
-#include "stm32l5xx_hal_dma.h"
-#include "stm32l5xx_hal_uart.h"  // UART 모듈 헤더 파일
-#include "main.h"
-#else
-void uart_send_string(const char *str) {
+void print_string(const char *str) {
     // Host 환경에서 UART 없이 동작. 필요시 stderr로 출력하거나 다른 방식 사용.
     fprintf(stderr, "UART: %s\n", str);
 }
-#endif
 
 using namespace llvm;
 
 namespace {
 
     struct MyTestPass : public PassInfoMixin<MyTestPass> {
-          // 생성자 및 복사 방지
-        MyTestPass() = default;
-        MyTestPass(const MyTestPass &) = delete;  // 복사 금지
-        MyTestPass &operator=(const MyTestPass &) = delete;  // 대입 연산 금지
-        MyTestPass(MyTestPass &&) = default;  // 이동 허용
-        MyTestPass &operator=(MyTestPass &&) = default;  // 이동 대입 허용
-
-
 
          PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
             std::string functionName = "Function Name: " + F.getName().str() + "\n";
-            uart_send_string(functionName.c_str());  // UART로 함수 이름 출력
-            return PreservedAnalyses::all();  // 패스가 변경되지 않음을 의미
+            print_string(functionName.c_str());  // UART로 함수 이름 출력
+            
+            //첫 번째 블록을 선택하여 코드 삽입
+            BasicBlock &EntryBlock = F.getEntryBlock();
+            IRBuilder<> builder(&EntryBlock.front());
+
+            // "runtime_func" 함수의 선언을 모듈에서 찾습니다.
+            Function *testPrint = F.getParent()->getFunction("test_print");
+            if (!testPrint) {
+                // 런타임 함수가 없으면 선언을 추가합니다.
+                LLVMContext &context = F.getContext();
+                FunctionType *funcType = FunctionType::get(Type::getInt8Ty(context), 0);
+                testPrint = Function::Create(funcType, Function::ExternalLinkage, "test_print", F.getParent());
+            }
+
+            // 함수 이름을 가져와서 문자열 리터럴로 변환
+            LLVMContext &context = F.getContext();
+            Value *funcName = builder.CreateGlobalStringPtr(F.getName());
+
+            // 함수의 시작 부분에 runtime_func 호출을 삽입
+            builder.CreateCall(testPrint, funcName);
+
+            return PreservedAnalyses::none();  // 함수에 변화가 있음을 표시
         }
     };
 }

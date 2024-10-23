@@ -71,6 +71,7 @@ add_definitions(-DSTM32L562xx)
 # )
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/llvm)
+add_subdirectory(${CMAKE_SOURCE_DIR}/runtime)
 
 # === C 프로젝트 빌드 (Makefile 사용) ===
 # C 프로젝트가 Makefile로 관리되므로, CMake에서 이를 호출
@@ -86,10 +87,17 @@ add_custom_target(
     apply_pass
     DEPENDS firmware
     COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTestPass.so -passes=my-test-pass -S -o ${CMAKE_BINARY_DIR}/output.ll  ${CMAKE_BINARY_DIR}/../stm32/input.ll 
+
+)
+
+add_custom_target(
+    build
+    DEPENDS apply_pass
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMAND llc -filetype=obj -march=arm -mcpu=cortex-m33 --float-abi=hard output.ll -o output.o 
-    COMMAND  arm-none-eabi-gcc -c ../stm32/startup_stm32l562xx.s -o startup.o
-    COMMAND arm-none-eabi-gcc output.o startup.o -DSTM32_ENV -o firmware.elf -T ../stm32/STM32L562xE_FLASH.ld -mcpu=cortex-m33 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-short-enums --specs=nosys.specs  
+    COMMAND arm-none-eabi-gcc -c ../stm32/startup_stm32l562xx.s -o startup.o
+    COMMAND arm-none-eabi-gcc -c ../runtime/testPrint.c -o runtime.o
+    COMMAND arm-none-eabi-gcc output.o startup.o runtime.o -DSTM32_ENV -o firmware.elf -T ../stm32/STM32L562xE_FLASH.ld -mcpu=cortex-m33 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-short-enums --specs=nosys.specs  
     COMMAND arm-none-eabi-objcopy -O binary firmware.elf firmware.bin
 
 )
