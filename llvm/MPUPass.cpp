@@ -1,48 +1,65 @@
-#include "llvm/Pass.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/Module.h"
-#include "llvm/Support/raw_ostream.h"
-
-using namespace llvm;
-
-namespace {
-
-struct StackMPUPass : public PassInfoMixin<StackMPUPass> {
-public:
-    PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
-};
-
-struct HeapMPUPass : public PassInfoMixin<HeapMPUPass> {
-    static char ID;
-    SecondPass() : FunctionPass(ID) {}
-
-    bool runOnFunction(Function &F) override {
-        errs() << "Running SecondPass on function: " << F.getName() << "\n";
-        return false;
-    }
-};
-
-struct GVMPUPass : public PassInfoMixin<GVMPUPass> {
-    static char ID;
-    SecondPass() : FunctionPass(ID) {}
-
-    bool runOnFunction(Function &F) override {
-        errs() << "Running SecondPass on function: " << F.getName() << "\n";
-        return false;
-    }
-};
+#include "MPUPass.h"
 
 PreservedAnalyses StackMPUPass::run(Function &F,
                                       FunctionAnalysisManager &AM) {
-  errs() << F.getName() << "\n";
-  return PreservedAnalyses::all();
+  errs() << "Analyzing function: " << F.getName() << "\n";
+
+    for (auto &BB : F) {
+        for (auto &I : BB) {
+            // Call analysis: CallInst를 통해 함수 호출 감지
+            if (CallInst *CI = dyn_cast<CallInst>(&I)) {
+                if (Function *calledFunc = CI->getCalledFunction()) {
+                    errs() << "  Function call detected: " 
+                           << F.getName() << " calls " 
+                           << calledFunc->getName() << "\n";
+                } else {
+                    errs() << "  Indirect function call detected in function: " 
+                           << F.getName() << "\n";
+                }
+            }
+
+            // Return analysis: ReturnInst를 통해 함수 리턴 감지
+            if (isa<ReturnInst>(&I)) {
+                errs() << "  Return detected in function: " 
+                       << F.getName() << "\n";
+            }
+        }
+    }
+
+    // 모든 분석 정보를 보존하도록 설정
+    return PreservedAnalyses::all();
 }
 
-} // namespace
+PreservedAnalyses HeapMPUPass::run(Function &F,
+                                      FunctionAnalysisManager &AM) {
+    // To be implemented
+    return PreservedAnalyses::all();
+}
 
-char FirstPass::ID = 0;
-char SecondPass::ID = 0;
+PreservedAnalyses GlobalVariableMPUPass::run(Function &F,
+                                      FunctionAnalysisManager &AM) {
+    // To be implemented
+    return PreservedAnalyses::all();
+}
 
-// 패스 등록
-static RegisterPass<FirstPass> X("first-pass", "First Pass Example", false, false);
-static RegisterPass<SecondPass> Y("second-pass", "Second Pass Example", false, false);
+
+// 패스 플러그인 등록
+extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginInfo() {
+    return {LLVM_PLUGIN_API_VERSION, "MPUPasses", LLVM_VERSION_STRING,
+        [](PassBuilder &PB) {
+            PB.registerPipelineParsingCallback(
+                [](StringRef Name, FunctionPassManager &FPM, ArrayRef<PassBuilder::PipelineElement>) {
+                    if (Name == "stack-mpu-pass") {
+                        FPM.addPass(StackMPUPass());
+                        return true;
+                    } else if (Name == "heap-mpu-pass") {
+                        FPM.addPass(HeapMPUPass());
+                        return true;
+                    } else if (Name == "global-variable-mpu-pass") {
+                        FPM.addPass(GlobalVariableMPUPass());
+                        return true;
+                    }
+                    return false;
+                });
+        }};
+}
