@@ -154,8 +154,9 @@ ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffuncti
 CFLAGS += $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
 
 TARGET_TRIPLE = arm-none-eabi
+GCC_ARM_PATH = /opt/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-eabi
 LLVM_FLAGS = -O2 -emit-llvm -S --target=$(TARGET_TRIPLE) $(MCU) $(C_DEFS) $(C_INCLUDES)
-LLVM_FLAGS += --sysroot=$(GCC_ARM_PATH)/arm-none-eabi -Wall -fdata-sections -ffunction-sections -fno-inline -fno-elide-constructors
+LLVM_FLAGS += --sysroot=$(GCC_ARM_PATH)/arm-none-eabi --gcc-toolchain=$(GCC_ARM_PATH) -Wall -fdata-sections -ffunction-sections -fno-inline -fno-elide-constructors
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -gdwarf-2
