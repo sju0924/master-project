@@ -44,6 +44,8 @@ add_library(runtime OBJECT ${RUNTIME_SRCS})
 # runtime.o 파일을 생성하는 명령어
 add_custom_command(
     OUTPUT ${CMAKE_BINARY_DIR}/runtime/runtime.o
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/runtime
+    COMMAND_EXPAND_LISTS
     COMMAND arm-none-eabi-ld -r $<TARGET_OBJECTS:runtime> -o ${CMAKE_BINARY_DIR}/runtime/runtime.o
     DEPENDS runtime
     COMMENT "Linking all object files into runtime.o"
