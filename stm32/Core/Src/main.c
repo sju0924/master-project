@@ -98,7 +98,7 @@ static void MX_USB_PCD_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+int num1 = 10;
 /* USER CODE END 0 */
 
 /**
@@ -147,12 +147,41 @@ int main(void)
   MX_TIM17_Init();
   MX_UCPD1_Init();
   MX_USB_PCD_Init();
+
   /* USER CODE BEGIN 2 */
+
+  char *allocation_test1 = (char *)malloc(sizeof(char)*10);
+  char *allocation_test2 = (char *)malloc(sizeof(char)*10);
+  char j = 'A';
+  for (int i = 0 ; i<9; i++){
+    allocation_test1[i] = j;
+    j++;
+  }
+  allocation_test1[9]='\0';
+
+  for (int i = 0 ; i<9; i++){
+    allocation_test2[i] = j;
+    j++;
+  }
+  allocation_test2[9]='\0';
+
+
+  allocation_test1[3]='Z';
+  allocation_test2[4]='Z';
+  num1=100;
+
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);        
+  HAL_UART_Transmit(&huart1, (uint8_t*)allocation_test1, strlen(allocation_test1), HAL_MAX_DELAY);
+  HAL_UART_Transmit(&huart1, (uint8_t*)allocation_test2, strlen(allocation_test2), HAL_MAX_DELAY);
+
+  free(allocation_test1);
+  free(allocation_test2);
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  
   while (1)
   {
     
@@ -167,6 +196,8 @@ int main(void)
         HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
         HAL_UART_Transmit(&huart1, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
         HAL_Delay(500);  // 500ms 대기
+
+        
     
     /* USER CODE END WHILE */
 

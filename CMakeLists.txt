@@ -1,4 +1,3 @@
-# set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_SYSTEM_PROCESSOR arm)
 
@@ -11,10 +10,6 @@ set(zstd_INCLUDE_DIR /usr/include)
 set(Terminfo_LIBRARIES /usr/lib/x86_64-linux-gnu/libtinfo.so)
 
 set(FFI_LIBRARIES /usr/lib/x86_64-linux-gnu/libffi.so)
-# # 크로스 컴파일러 설정
-# set(CMAKE_C_COMPILER /opt/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-gcc)
-# set(CMAKE_CXX_COMPILER /opt/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-g++)
-# set(CMAKE_ASM_COMPILER /opt/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-gcc)
 
 set(CMAKE_C_COMPILER /usr/bin/clang)
 set(CMAKE_CXX_COMPILER /usr/bin/clang++)
@@ -39,37 +34,6 @@ message(STATUS "C FLAGS: ${CMAKE_C_FLAGS}")
 # === 사용할 MCU 모델 정의 ===
 # MCU 모델 정의. STM32L562xx를 사용.
 add_definitions(-DSTM32L562xx)
-
-# === 컴파일러 플래그 설정 (임베디드 환경) ===
-
-# # MCU에 대한 설정 (STM32L5 예시)
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=cortex-m33 -mthumb")
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=cortex-m33 -mthumb")
-
-# set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/stm32/STM32L562xE_FLASH.ld)
-# set(STARTUP_FILE ${CMAKE_SOURCE_DIR}/stm32/startup_stm32l562xx.s)
-# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -T${LINKER_SCRIPT}")
-
-
-
-# === LLVM Pass 프로젝트 빌드 ===
-# LLVM Pass는 CMake로 관리되므로 add_subdirectory로 빌드
-# # CMakeLists.txt에서 헤더 파일 경로 추가
-# include_directories(${CMAKE_SOURCE_DIR}/stm32/Core/Inc)
-# include_directories(${CMAKE_SOURCE_DIR}/stm32/Drivers/STM32L5xx_HAL_Driver/Inc)
-# include_directories(${CMAKE_SOURCE_DIR}/stm32/Drivers/CMSIS/Device/ST/STM32L5xx/Include)
-# include_directories(${CMAKE_SOURCE_DIR}/stm32/Drivers/CMSIS/Include)
-
-# set(HAL_DRIVER_SRCS
-#     ${CMAKE_SOURCE_DIR}/stm32/Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_uart.c
-#     ${CMAKE_SOURCE_DIR}/stm32/Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal.c
-#     ${CMAKE_SOURCE_DIR}/stm32/Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_rcc.c
-#     ${CMAKE_SOURCE_DIR}/stm32/Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_gpio.c
-#     ${CMAKE_SOURCE_DIR}/stm32/Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_dma.c
-#     ${CMAKE_SOURCE_DIR}/stm32/Core/Src/system_stm32l5xx.c
-#     ${CMAKE_SOURCE_DIR}/stm32/Core/Src/main.c
-# )
-
 add_subdirectory(${CMAKE_SOURCE_DIR}/llvm)
 add_subdirectory(${CMAKE_SOURCE_DIR}/runtime)
 

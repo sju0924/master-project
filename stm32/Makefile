@@ -160,7 +160,7 @@ LLVM_FLAGS += --sysroot=$(GCC_ARM_PATH)/arm-none-eabi --gcc-toolchain=$(GCC_ARM_
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -gdwarf-2
-LLVM_FLAGS += -g -gdwarf-2 
+LLVM_FLAGS += -gdwarf-2  -g 
 endif
 
 

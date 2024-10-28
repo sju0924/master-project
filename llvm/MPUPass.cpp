@@ -36,6 +36,7 @@ PreservedAnalyses HeapMPUPass::run(Function &F,
     LLVMContext &context = F.getContext();
     const DataLayout &dataLayout = F.getParent()->getDataLayout();
 
+
     for (auto &BB : F) {
             for (auto &I : BB) {
                 // 힙 메모리 할당 함수 (malloc, calloc 등) 감지
@@ -130,10 +131,67 @@ bool HeapMPUPass::checkHeapAccessChanged(Value *currentPtr, Instruction *I) {
     return false;
 }
 
+
 PreservedAnalyses GlobalVariableMPUPass::run(Function &F,
                                       FunctionAnalysisManager &AM) {
-    // To be implemented
+    
+     Module *M = F.getParent();
+
+    for (auto &GV : M->globals()) {
+        globalVars.insert(&GV);
+        errs() << "Tracking global variable: " << GV.getName() << "\n";
+    }
+      if (!globalVars.empty()) {
+        // set의 마지막 요소 가져오기
+        lastGlobalVariable = *std::prev(globalVars.end());
+        errs() << "Last element in set: " << lastGlobalVariable <<  "\n";
+    }
+
+
+     for (auto &BB : F) {
+            for (auto &I : BB) {
+                // load 명령어에서 전역 변수 접근 탐지
+                if (auto *LI = dyn_cast<LoadInst>(&I)) {
+                    CheckGlobalVariableAccessChanged(LI->getPointerOperand(), &I);
+                }
+                // store 명령어에서 전역 변수 접근 탐지
+                else if (auto *SI = dyn_cast<StoreInst>(&I)) {
+                    CheckGlobalVariableAccessChanged(SI->getPointerOperand(), &I);
+                }
+            }
+        }
     return PreservedAnalyses::all();
+}
+
+  
+bool GlobalVariableMPUPass::isGlobalVariable(Value *ptr){
+    // 전역 변수라면 GlobalVariable로 캐스팅 가능
+    if (auto *GV = dyn_cast<GlobalVariable>(ptr)) {
+        return globalVars.count(GV) > 0;
+    }
+    return false;
+}
+
+bool GlobalVariableMPUPass::CheckGlobalVariableAccessChanged(Value *currentPtr, Instruction *I){
+    if (isGlobalVariable(currentPtr)) {
+        GlobalVariable* currentGlobalVariable = dyn_cast<GlobalVariable>(currentPtr);
+        // lastGlobalVariable 유효하지 않거나 해제된 경우 초기화
+        if (lastGlobalVariable && globalVars.find(lastGlobalVariable) == globalVars.end()) {
+            lastGlobalVariable = nullptr;
+        }
+        errs()<<"last GV: "<<lastGlobalVariable<<", cur GV: "<<currentGlobalVariable<<"\n";
+        if (lastGlobalVariable && lastGlobalVariable != currentGlobalVariable) {
+            errs() << "Accessing a different global variable at: " << *I << "\n";
+            lastGlobalVariable = currentGlobalVariable;
+            return true;
+        } else {
+            errs() << "Accessing the same global object at: " << *I << "\n";
+            return false;
+        }
+        
+    }
+    
+    return false;
 }
 
 
