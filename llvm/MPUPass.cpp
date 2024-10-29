@@ -4,10 +4,35 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                                       FunctionAnalysisManager &AM) {
   errs() << "Analyzing function: " << F.getName() << "\n";
 
+    IRBuilder<> Builder(&*F.getEntryBlock().getFirstInsertionPt());
+
+    // RSP 조정을 위한 어셈블리 코드 삽입
+    // Inline assembly to adjust rsp by 64 bytes (redzone)
+    InlineAsm *SubRSP = InlineAsm::get(
+        FunctionType::get(Type::getVoidTy(Ctx), false),
+        "sub rsp, 64", "", true);
+
+    InlineAsm *AddRSP = InlineAsm::get(
+        FunctionType::get(Type::getVoidTy(Ctx), false),
+        "add rsp, 64", "", true);
+
+
     for (auto &BB : F) {
-        for (auto &I : BB) {
-            // Call analysis: CallInst를 통해 함수 호출 감지
-            if (CallInst *CI = dyn_cast<CallInst>(&I)) {
+        for (auto I = BB.begin(); I != BB.end(); ++I) {
+            // CallInst를 통해 함수 호출 감지
+            if (CallInst *CI = dyn_cast<CallInst>(&*I)) {
+                // 함수 호출 전: "sub rsp, 64" 삽입
+                IRBuilder<> BuilderBefore(CI);
+                BuilderBefore.CreateCall(SubRSP);
+
+                // 함수 호출 후: "add rsp, 64" 삽입
+                ++I; // Move iterator to the next instruction
+                if (I != BB.end()) { // Check if iterator is still valid
+                    IRBuilder<> BuilderAfter(&*I);
+                    BuilderAfter.CreateCall(AddRSP);
+                }
+                --I; // Restore iterator to point at the original call
+
                 if (Function *calledFunc = CI->getCalledFunction()) {
                     errs() << "  Function call detected: " 
                            << F.getName() << " calls " 
@@ -19,7 +44,9 @@ PreservedAnalyses StackMPUPass::run(Function &F,
             }
 
             // Return analysis: ReturnInst를 통해 함수 리턴 감지
-            if (isa<ReturnInst>(&I)) {
+            if (ReturnInst *Ret = dyn_cast<ReturnInst>(BB.getTerminator())) {
+                IRBuilder<> RetBuilder(Ret);
+                RetBuilder.CreateLoad(RedZoneAlloc);  // 복구 로직 추가
                 errs() << "  Return detected in function: " 
                        << F.getName() << "\n";
             }
