@@ -200,7 +200,7 @@ void MPU_Enable(void) {
      }
 }
 
-void configure_mpu_redzone_for_call(uint32_t stack_frame_size) {
+void configure_mpu_redzone_for_call() {
     uint32_t sp;
     __asm__ volatile("mov %0, sp" : "=r"(sp));  // 현재 SP 가져오기
 
