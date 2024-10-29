@@ -36,7 +36,6 @@ BUILD_DIR = build
 ######################################
 # C sources
 C_SOURCES =  \
-Core/Src/main.c \
 Core/Src/stm32l5xx_it.c \
 Core/Src/stm32l5xx_hal_msp.c \
 Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_utils.c \
@@ -180,7 +179,7 @@ LIBDIR =
 LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
 
 # 단일 LLVM IR 파일 이름
-LL_FILE = $(BUILD_DIR)/input.ll
+LL_FILE = $(BUILD_DIR)/drivers.ll
 LL_FILES = \
 $(BUILD_DIR)/stm32l5xx_it.ll \
 $(BUILD_DIR)/stm32l5xx_hal_msp.ll \
@@ -226,9 +225,10 @@ $(BUILD_DIR)/stm32l5xx_ll_dma.ll \
 $(BUILD_DIR)/stm32l5xx_hal_pcd.ll \
 $(BUILD_DIR)/stm32l5xx_hal_pcd_ex.ll \
 $(BUILD_DIR)/stm32l5xx_ll_usb.ll \
-$(BUILD_DIR)/system_stm32l5xx.ll  \
-$(BUILD_DIR)/main.ll 
+$(BUILD_DIR)/system_stm32l5xx.ll \
 
+APPLICATION_LL_FILES = $(BUILD_DIR)/main.ll 
+APPLICATION_C_SOURCES = Core/Src/main.c \
 # default action: build all
 all: $(LL_FILE)
 direct: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin
@@ -253,7 +253,8 @@ $(BUILD_DIR)/%.ll: %.c Makefile | $(BUILD_DIR)
 
 # 모든 .ll 파일을 링크하여 output.ll 생성
 $(LL_FILE): $(LL_FILES)
-	llvm-link -o input.ll $(LL_FILES) 
+	llvm-link -o drivers.ll $(LL_FILES) 
+	$(LLVM_CC) $(LLVM_FLAGS) -emit-llvm -c ${APPLICATION_C_SOURCES} -o ${APPLICATION_LL_FILES}
 
 $(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR) 
 	$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@

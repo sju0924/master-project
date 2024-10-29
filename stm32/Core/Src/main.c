@@ -148,8 +148,32 @@ int main(void)
   MX_UCPD1_Init();
   MX_USB_PCD_Init();
 
-  /* USER CODE BEGIN 2 */
+  
 
+  /* USER CODE BEGIN 2 */
+  // 1. MPU 비활성화
+   // Disable MPU before configuring
+  HAL_MPU_Disable();
+  MPU_Region_InitTypeDef MPU_InitStruct = {0};
+
+  // Configure MPU Region 0 to Region 5
+    for (uint8_t region = MPU_REGION_NUMBER0; region <= MPU_REGION_NUMBER5; ++region) {
+        MPU_InitStruct.Enable = MPU_REGION_ENABLE;
+        MPU_InitStruct.Number = region;
+        MPU_InitStruct.BaseAddress = 0x20000000 + (region * 0x100);      // 예시 시작 주소
+        MPU_InitStruct.LimitAddress = MPU_InitStruct.BaseAddress + 0xFF; // 제한 주소 (예: 64KB 범위)
+        MPU_InitStruct.AttributesIndex = 0;                                // 기본 속성 인덱스
+        MPU_InitStruct.AccessPermission = MPU_HFNMI_PRIVDEF_NONE;          // 전체 접근 권한 부여
+        MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;        // 실행 가능
+        MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE; 
+
+      HAL_MPU_ConfigRegion(&MPU_InitStruct);  // Apply configuration to current region
+  }
+
+  // Disable MPU if no further configuration is needed or keep it enabled as required
+  HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+
+  num1 = 100;
   char *allocation_test1 = (char *)malloc(sizeof(char)*10);
   char *allocation_test2 = (char *)malloc(sizeof(char)*10);
   char j = 'A';
@@ -168,8 +192,6 @@ int main(void)
 
   allocation_test1[3]='Z';
   allocation_test2[4]='Z';
-  num1=100;
-
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);        
   HAL_UART_Transmit(&huart1, (uint8_t*)allocation_test1, strlen(allocation_test1), HAL_MAX_DELAY);
   HAL_UART_Transmit(&huart1, (uint8_t*)allocation_test2, strlen(allocation_test2), HAL_MAX_DELAY);
