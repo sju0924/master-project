@@ -50,7 +50,8 @@ add_custom_target(firmware ALL
 add_custom_target(
     apply_pass
     DEPENDS firmware
-    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTestPass.so -passes=my-test-pass -S -o ${CMAKE_BINARY_DIR}/output.ll  ${CMAKE_BINARY_DIR}/../stm32/input.ll 
+    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTestPass.so -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="my-test-pass,stack-mpu-pass,heap-mpu-pass,global-variable-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/main_output.ll  ${CMAKE_BINARY_DIR}/../stm32/build/main.ll 
+    COMMAND llvm-link -o output.ll ${CMAKE_BINARY_DIR}/../stm32/drivers.ll ${CMAKE_BINARY_DIR}/main_output.ll 
 
 )
 

@@ -1,5 +1,7 @@
 build/
 stm32/build/
 llvm/build
+runtime/build
 *.ll
 *.ll.ll
+*.o
