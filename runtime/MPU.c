@@ -2,8 +2,7 @@
 // #include "stm32l5xx_hal_conf.h"
 // #include "stm32l562xx.h"  // IRQn_Type 및 Cortex-M33 장치 관련 정의 포함
 // #include "core_cm33.h"
-#include <stdint.h>
-#include <stdio.h>
+
 #define  MPU_HFNMI_PRIVDEF_NONE          0U
 /* Exported constants --------------------------------------------------------*/
 
@@ -138,18 +137,9 @@
 #define OUTER(__ATTR__)        ((__ATTR__) << 4U)
 #define INNER_OUTER(__ATTR__)  ((__ATTR__) | ((__ATTR__) << 4U))
 
-#define ARM_MPU_REGION_SIZE_32B      ((uint8_t)0x04U) ///!< MPU Region Size 32 Bytes
-#define ARM_MPU_REGION_SIZE_64B      ((uint8_t)0x05U) ///!< MPU Region Size 64 Bytes
-#define ARM_MPU_REGION_SIZE_128B     ((uint8_t)0x06U) ///!< MPU Region Size 128 Bytes
-#define ARM_MPU_REGION_SIZE_256B     ((uint8_t)0x07U) ///!< MPU Region Size 256 Bytes
-#define ARM_MPU_REGION_SIZE_512B     ((uint8_t)0x08U) ///!< MPU Region Size 512 Bytes
-#define ARM_MPU_REGION_SIZE_1KB      ((uint8_t)0x09U) ///!< MPU Region Size 1 KByte
-#define ARM_MPU_REGION_SIZE_2KB      ((uint8_t)0x0AU) ///!< MPU Region Size 2 KBytes
-#define ARM_MPU_REGION_SIZE_4KB      ((uint8_t)0x0BU) ///!< MPU Region Size 4 KBytes
-#define ARM_MPU_REGION_SIZE_8KB      ((uint8_t)0x0CU) ///!< MPU Region Size 8 KBytes
-#define ARM_MPU_REGION_SIZE_16KB     ((uint8_t)0x0DU) ///!< MPU Region Size 16 KBytes
-#define ARM_MPU_REGION_SIZE_32KB     ((uint8_t)0x0EU) ///!< MPU Region Size 32 KBytes
-#define ARM_MPU_REGION_SIZE_64KB     ((uint8_t)0x0FU) ///!< MPU Region Size 64 KBytes
+#include "runtimeConfig.h"
+
+
 /**
   * @}
   */
@@ -172,8 +162,6 @@ typedef struct
                                                      This parameter can be a value of @ref CORTEX_MPU_Access_Shareable              */
 } MPU_Region_InitTypeDef;
 
-#define ALIGNMENT 32
-#define REDZONE_SIZE  ARM_MPU_REGION_SIZE_64B
 
 void HAL_MPU_Enable(uint32_t MPU_Control);
 void HAL_MPU_EnableRegion(uint32_t RegionNumber);
@@ -274,7 +262,7 @@ void configure_mpu_redzone_for_heap_access(void* ptr){
 
     // 디버그
     char buffer[100];
-    snprintf(buffer, sizeof(buffer), "Set Heap redzone:  Start address: %p, end address: %p", (void*)start_address, (void*)end_address);
+    snprintf(buffer, sizeof(buffer), "Set Heap redzone:  Start address: %p, end address: %p", (void*)start_addr, (void*)end_addr);
     uart_debug_print(buffer);
 
     // MPU 설정
@@ -284,10 +272,32 @@ void configure_mpu_redzone_for_heap_access(void* ptr){
     MPU_ConfigureRegion(MPU_REGION_NUMBER2, MPU_REGION_ENABLE, start_addr - (REDZONE_SIZE / 2), REDZONE_SIZE / 2, MPU_PRIVILEGED_DEFAULT);  // Red Zone 앞쪽 설정  
 
     // Red Zone 뒷부분 설정 (MPU 영역 3)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER3, MPU_REGION_ENABLE, back_addr, (REDZONE_SIZE / 2), MPU_PRIVILEGED_DEFAULT); // Red Zone 뒤쪽 설정
+    MPU_ConfigureRegion(MPU_REGION_NUMBER3, MPU_REGION_ENABLE, end_addr, (REDZONE_SIZE / 2), MPU_PRIVILEGED_DEFAULT); // Red Zone 뒤쪽 설정
   
     HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 
+}
+
+void configure_mpu_redzone_for_global(void *ptr, uint64_t size) {
+    uintptr_t start_addr = (uintptr_t)ptr;
+    uintptr_t end_addr = start_addr + size;
+    end_addr = (end_addr + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
+
+    // 디버그
+    char buffer[100];
+    snprintf(buffer, sizeof(buffer), "Set Heap redzone:  Start address: %p, end address: %p", (void*)start_addr, (void*)end_addr);
+    uart_debug_print(buffer);
+
+    // MPU 설정
+    HAL_MPU_Disable();
+
+    // Red Zone 앞부분 설정 (MPU 영역 4)
+    MPU_ConfigureRegion(MPU_REGION_NUMBER4, MPU_REGION_ENABLE, start_addr - (REDZONE_SIZE / 2), REDZONE_SIZE / 2, MPU_PRIVILEGED_DEFAULT);  // Red Zone 앞쪽 설정  
+
+    // Red Zone 뒷부분 설정 (MPU 영역 5)
+    MPU_ConfigureRegion(MPU_REGION_NUMBER5, MPU_REGION_ENABLE, end_addr, (REDZONE_SIZE / 2), MPU_PRIVILEGED_DEFAULT); // Red Zone 뒤쪽 설정
+  
+    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 }
 
 void MPU_ConfigureRegion(uint32_t region_num, uint32_t enable, uint32_t base_address, uint32_t size, uint32_t access_permission) {
