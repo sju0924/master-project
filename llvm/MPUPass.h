@@ -7,6 +7,7 @@
 #include "llvm/IR/IRBuilder.h" 
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/InlineAsm.h"
 #include <set>
 
 
@@ -61,6 +62,7 @@ private:
         - 0: 이전과 같은 힙 오브젝트에 접근함
 */
     bool checkHeapAccessChanged(Value *currentPtr, Instruction *I);
+    Value *getHeapAddress(Value *ptr);
 
 public:
     PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
@@ -99,6 +101,15 @@ private:
             - 0: 포인터가 전역 변수가 아님
     */ 
     bool isGlobalVariable(Value *ptr);
+
+     /*
+        @description: 정리 필요
+        @input
+            - Value *ptrOperand: 정리 필요
+        @output
+            - 1: 포인터가 전역 변수임
+    */ 
+    GlobalVariable* istInitializedNonConstantGlobalVariable(Value *ptrOperand)
  
 }; 
 

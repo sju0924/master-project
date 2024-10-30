@@ -3,6 +3,7 @@
 // #include "stm32l562xx.h"  // IRQn_Type 및 Cortex-M33 장치 관련 정의 포함
 // #include "core_cm33.h"
 #include <stdint.h>
+#include <stdio.h>
 #define  MPU_HFNMI_PRIVDEF_NONE          0U
 /* Exported constants --------------------------------------------------------*/
 
@@ -34,7 +35,6 @@
   * @}
   */
 
-#if (__MPU_PRESENT == 1)
 /** @defgroup CORTEX_MPU_HFNMI_PRIVDEF_Control CORTEX MPU HFNMI and PRIVILEGED Access control
   * @{
   */
@@ -172,12 +172,14 @@ typedef struct
                                                      This parameter can be a value of @ref CORTEX_MPU_Access_Shareable              */
 } MPU_Region_InitTypeDef;
 
-
-const unsigned int REDZONE_SIZE = ARM_MPU_REGION_SIZE_32B;
+#define ALIGNMENT 32
+#define REDZONE_SIZE  ARM_MPU_REGION_SIZE_64B
 
 void HAL_MPU_Enable(uint32_t MPU_Control);
 void HAL_MPU_EnableRegion(uint32_t RegionNumber);
+void HAL_MPU_Disable();
 void HAL_MPU_ConfigRegion(MPU_Region_InitTypeDef *MPU_RegionInit);
+void uart_debug_print(const char *str);
 /*
 MPU_Enable: MPU 활성화
 */
@@ -191,7 +193,7 @@ MPU_ConfigureRegion: MPU 영역 설정
     - uint32_t size: MPU 영역 크기(32의 배수)
     - uint32_t access_permission: 권한
 */
-void MPU_ConfigureRegion(uint32_t region, uint32_t base_address, uint32_t size, uint32_t access_permission) ;
+void MPU_ConfigureRegion(uint32_t region_num, uint32_t enable, uint32_t base_address, uint32_t size, uint32_t access_permission);
 
 void MPU_Enable(void) {
     HAL_MPU_Enable(MPU_HFNMI_PRIVDEF_NONE);
@@ -201,39 +203,106 @@ void MPU_Enable(void) {
 }
 
 void configure_mpu_redzone_for_call() {
-    uint32_t sp;
+    uint32_t sp, r7;
     __asm__ volatile("mov %0, sp" : "=r"(sp));  // 현재 SP 가져오기
+    __asm__ volatile("mov %0, r7" : "=r"(r7));  // 현재 SP 가져오기
+
+    sp = sp - 32 + sp % 32;
+    r7 = r7 + (32 - r7 % 32);
 
     // Red Zone의 앞뒤 주소 계산
-    uint32_t front_addr = sp - stack_frame_size - REDZONE_SIZE;
-    uint32_t back_addr = sp + REDZONE_SIZE;
+    uint32_t front_addr = sp - REDZONE_SIZE; // Redzone 0이 시작되는 주소
+    uint32_t back_addr = r7; // Redzone 1이 시작하는 주소
+
+    // 디버그
+    char buffer[100];
+    snprintf(buffer, sizeof(buffer), "Stack Pointer and R7 values:  SP: %x, R7: %x", sp, r7);
+    uart_debug_print(buffer);
 
     HAL_MPU_Disable();
 
     // Red Zone 앞부분 설정 (MPU 영역 0)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER0, front_addr, REDZONE_SIZE, MPU_PRIVILEGED_DEFAULT);  // Red Zone 앞쪽 설정  
+    MPU_ConfigureRegion(MPU_REGION_NUMBER0, MPU_REGION_ENABLE, front_addr, REDZONE_SIZE, MPU_PRIVILEGED_DEFAULT);  // Red Zone 앞쪽 설정  
 
     // Red Zone 뒷부분 설정 (MPU 영역 1)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER1, back_addr - REDZONE_SIZE, REDZONE_SIZE, MPU_PRIVILEGED_DEFAULT); // Red Zone 뒤쪽 설정
+    MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_ENABLE, back_addr, REDZONE_SIZE, MPU_PRIVILEGED_DEFAULT); // Red Zone 뒤쪽 설정
   
     HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 }
 
+void configure_mpu_redzone_for_return() {
+    uint32_t sp, r7;
+    __asm__ volatile("mov %0, sp" : "=r"(sp));  // 현재 SP 가져오기
+    __asm__ volatile("mov %0, r7" : "=r"(r7));  // 현재 SP 가져오기
 
-void MPU_ConfigureRegion(uint32_t region_num, uint32_t base_address, uint32_t size, uint32_t access_permission) {
-    
-    MPU_Region_InitTypeDef* region;
+    sp = sp - 32 + sp % 32;
+    r7 = r7 + (32 - r7 % 32);
 
-    region->Enable = MPU_REGION_ENABLE;
-    region->Number = region_num;
-    region->BaseAddress = base_address;
-    region->LimitAddress = base_address + size;
-    region->AttributesIndex = 0;
-    MPU_InitStruct.AccessPermission = access_permission;          // 전체 접근 권한 부여
-    MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;        // 실행 가능
-    MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE; 
+    // Red Zone의 앞뒤 주소 계산
+    uint32_t front_addr = sp - REDZONE_SIZE; // Redzone 0이 시작되는 주소
+    uint32_t back_addr = r7; // Redzone 1이 시작하는 주소
 
+    // 디버그
+    char buffer[100];
+    snprintf(buffer, sizeof(buffer), "Unset Stack Pointer and R7 values:  SP: %x, R7: %x", sp, r7);
+    uart_debug_print(buffer);
 
-    HAL_MPU_ConfigRegion(region);
+    HAL_MPU_Disable();
+
+    // Red Zone 앞부분 설정 (MPU 영역 0)
+    MPU_ConfigureRegion(MPU_REGION_NUMBER0, MPU_REGION_DISABLE, front_addr, REDZONE_SIZE, MPU_PRIVILEGED_DEFAULT);  // Red Zone 앞쪽 설정  
+
+    // Red Zone 뒷부분 설정 (MPU 영역 1)
+    MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_DISABLE, back_addr, REDZONE_SIZE, MPU_PRIVILEGED_DEFAULT); // Red Zone 뒤쪽 설정
+  
+    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+}
+
+void configure_mpu_redzone_for_heap_access(void* ptr){
+        if (!ptr) {
+        printf("Invalid pointer\n");
+        return;
+    }
+
+    // 메타데이터 위치를 계산
+    HeapMetadata* metadata = (HeapMetadata*)((uintptr_t)ptr - (REDZONE_SIZE / 2) - sizeof(HeapMetadata));
+
+    // 힙 객체의 시작과 끝 주소 계산
+    uintptr_t start_addr = (uintptr_t)ptr;
+    uintptr_t end_addr = start_addr + metadata->size;
+    end_addr = (end_addr + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
+
+    // 디버그
+    char buffer[100];
+    snprintf(buffer, sizeof(buffer), "Set Heap redzone:  Start address: %p, end address: %p", (void*)start_address, (void*)end_address);
+    uart_debug_print(buffer);
+
+    // MPU 설정
+    HAL_MPU_Disable();
+
+    // Red Zone 앞부분 설정 (MPU 영역 2)
+    MPU_ConfigureRegion(MPU_REGION_NUMBER2, MPU_REGION_ENABLE, start_addr - (REDZONE_SIZE / 2), REDZONE_SIZE / 2, MPU_PRIVILEGED_DEFAULT);  // Red Zone 앞쪽 설정  
+
+    // Red Zone 뒷부분 설정 (MPU 영역 3)
+    MPU_ConfigureRegion(MPU_REGION_NUMBER3, MPU_REGION_ENABLE, back_addr, (REDZONE_SIZE / 2), MPU_PRIVILEGED_DEFAULT); // Red Zone 뒤쪽 설정
+  
+    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 
 }
+
+void MPU_ConfigureRegion(uint32_t region_num, uint32_t enable, uint32_t base_address, uint32_t size, uint32_t access_permission) {
+    MPU_Region_InitTypeDef region;  // 지역 변수로 선언
+
+    region.Enable = enable;
+    region.Number = region_num;
+    region.BaseAddress = base_address;
+    region.LimitAddress = base_address + size - 1;  // LimitAddress는 마지막 주소이므로 -1 필요
+    region.AttributesIndex = 0;
+    region.AccessPermission = access_permission;  // 접근 권한 설정
+    region.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;  // 실행 가능
+    region.IsShareable = MPU_ACCESS_NOT_SHAREABLE;  // 공유 불가 설정
+
+    // 설정된 지역 변수를 사용하여 MPU 영역 구성
+    HAL_MPU_ConfigRegion(&region);
+}
+

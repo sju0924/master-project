@@ -4,25 +4,37 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                                       FunctionAnalysisManager &AM) {
   errs() << "Analyzing function: " << F.getName() << "\n";
 
-    IRBuilder<> Builder(&*F.getEntryBlock().getFirstInsertionPt());
+    
+    // 함수 실행 시 Stack Redzone 설정
+    BasicBlock &EntryBlock = F.getEntryBlock();
+    IRBuilder<> builder(&EntryBlock.front());
+    LLVMContext &context = F.getContext();
+
+    // configure_mpu_redzone_for_call 함수 선언을 찾거나 생성
+    FunctionCallee configureMPURedzoneForCall = M->getOrInsertFunction(
+        "configure_mpu_redzone_for_call",
+        Type::getVoidTy(context)  // 반환 타입 (void)
+    );
+    // 함수의 시작 부분에 configure_mpu_redzone_for_call 호출을 삽입
+    builder.CreateCall(configureMPURedzoneForCall);
 
     // RSP 조정을 위한 어셈블리 코드 삽입
     // Inline assembly to adjust rsp by 64 bytes (redzone)
     InlineAsm *SubRSP = InlineAsm::get(
-        FunctionType::get(Type::getVoidTy(Ctx), false),
-        "sub rsp, 64", "", true);
+        FunctionType::get(Type::getVoidTy(context), false),
+        "sub rsp, 72", "", true);
 
     InlineAsm *AddRSP = InlineAsm::get(
-        FunctionType::get(Type::getVoidTy(Ctx), false),
-        "add rsp, 64", "", true);
+        FunctionType::get(Type::getVoidTy(context), false),
+        "add rsp, 72", "", true);
 
-
-    for (auto &BB : F) {
+        for (auto &BB : F) {
         for (auto I = BB.begin(); I != BB.end(); ++I) {
             // CallInst를 통해 함수 호출 감지
             if (CallInst *CI = dyn_cast<CallInst>(&*I)) {
                 // 함수 호출 전: "sub rsp, 64" 삽입
                 IRBuilder<> BuilderBefore(CI);
+                BuilderBefore.SetInsertPoint(CI); 
                 BuilderBefore.CreateCall(SubRSP);
 
                 // 함수 호출 후: "add rsp, 64" 삽입
@@ -31,7 +43,11 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                     IRBuilder<> BuilderAfter(&*I);
                     BuilderAfter.CreateCall(AddRSP);
                 }
-                --I; // Restore iterator to point at the original call
+                --I; 
+                
+                // Restore iterator to point at the original call
+                IRBuilder<> BuilderRedzone(CI->getNextNode());
+                BuilderRedzone.CreateCall(configureMPURedzoneForCall);
 
                 if (Function *calledFunc = CI->getCalledFunction()) {
                     errs() << "  Function call detected: " 
@@ -46,7 +62,15 @@ PreservedAnalyses StackMPUPass::run(Function &F,
             // Return analysis: ReturnInst를 통해 함수 리턴 감지
             if (ReturnInst *Ret = dyn_cast<ReturnInst>(BB.getTerminator())) {
                 IRBuilder<> RetBuilder(Ret);
-                RetBuilder.CreateLoad(RedZoneAlloc);  // 복구 로직 추가
+
+                FunctionCallee configureMPURedzoneForReturn = M->getOrInsertFunction(
+                    "configure_mpu_redzone_for_return",
+                    Type::getVoidTy(context)  // 반환 타입 (void)
+                );
+
+                // 함수 리턴 후 
+                RetBuilder.SetInsertPoint(Ret);  // Ret 위치에 삽입 지점 설정
+                RetBuilder.CreateCall(configureMPURedzoneForReturn);
                 errs() << "  Return detected in function: " 
                        << F.getName() << "\n";
             }
@@ -62,6 +86,14 @@ PreservedAnalyses HeapMPUPass::run(Function &F,
     // 함수 내 모든 명령어를 순회하며 힙 접근 검사
     LLVMContext &context = F.getContext();
     const DataLayout &dataLayout = F.getParent()->getDataLayout();
+    IRBuilder<> Builder(F.getContext());
+
+     // configure_mpu_redzone_for_heap_access 함수 선언을 가져오거나 생성
+    FunctionCallee configureMPUFunc = M->getOrInsertFunction(
+        "configure_mpu_redzone_for_heap_access",
+        Type::getVoidTy(Context),
+        Type::getInt8PtrTy(Context)
+    );
 
 
     for (auto &BB : F) {
@@ -93,12 +125,19 @@ PreservedAnalyses HeapMPUPass::run(Function &F,
                         }
                     }
                 }
+                
 
                 // load/store 명령어로 힙 오브젝트 접근 감지
                 if (LoadInst *LI = dyn_cast<LoadInst>(&I)) {
-                    checkHeapAccessChanged(LI->getPointerOperand(), &I);
+                    if(checkHeapAccessChanged(LI->getPointerOperand(), &I)){
+                        Builder.SetInsertPoint(LI->getNextNode());
+                        Builder.CreateCall(configure_mpu_redzone_for_heap_access, lastHeapObject);
+                    }
                 } else if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
-                    checkHeapAccessChanged(SI->getPointerOperand(), &I);
+                    if(checkHeapAccessChanged(SI->getPointerOperand(), &I)){
+                        Builder.SetInsertPoint(SI->getNextNode());
+                        Builder.CreateCall(configure_mpu_redzone_for_heap_access, lastHeapObject);
+                    }
                 }
             }
         }
@@ -135,6 +174,7 @@ bool HeapMPUPass::_isHeapObject( Instruction *I, Value *ptr, Value *heapPtr, uin
     return false;
 }
 
+
 bool HeapMPUPass::checkHeapAccessChanged(Value *currentPtr, Instruction *I) {
 
     for (auto &[heapPtr, size] : heapObjects) {
@@ -162,8 +202,74 @@ bool HeapMPUPass::checkHeapAccessChanged(Value *currentPtr, Instruction *I) {
 PreservedAnalyses GlobalVariableMPUPass::run(Function &F,
                                       FunctionAnalysisManager &AM) {
     
-     Module *M = F.getParent();
+    /////////////////////////////
+    // 전역 변수에 REDZONE 삽입 //
+    /////////////////////////////
 
+    Module *M = F.getParent();
+    LLVMContext &Context = M.getContext();
+    Type *int8Ty = Type::getInt8Ty(Context);
+    ArrayType *redzoneType = ArrayType::get(int8Ty, 32); // 32바이트 레드존 타입
+
+    std::vector<GlobalVariable*> globalsToReplace;
+
+    // 레드존을 추가할 전역 변수 식별
+    for (GlobalVariable &GV : M.globals()) {
+        if (!GV.isConstant() && GV.hasInitializer()) { // 상수가 아닌 초기화된 전역 변수만 처리
+            globalsToReplace.push_back(&GV);
+        }
+    }
+
+    // 전역 변수 교체 및 MPU 보호 함수 호출 삽입
+    for (GlobalVariable *GV : globalsToReplace) {
+        Type *originalType = GV.getValueType();
+        uint64_t globalSize = DL.getTypeAllocSize(originalType); // 전역 변수 크기 계산
+
+        // 전역 변수 + 레드존을 포함하는 새로운 구조체 타입 생성
+        StructType *structWithRedzoneType = StructType::create(
+            {redzoneType, originalType, redzoneType}, // [앞 레드존, 전역 변수, 뒤 레드존]
+            GV->getName().str() + "_with_redzone"
+        );
+
+        // 새로운 전역 변수 생성
+        GlobalVariable *newGV = new GlobalVariable(
+            M,
+            structWithRedzoneType,
+            GV->isConstant(),
+            GV->getLinkage(),
+            nullptr,
+            GV->getName() + "_with_redzone"
+        );
+
+        // 기존 초기화 값 설정
+        Constant *zeroInit = ConstantAggregateZero::get(redzoneType);
+        Constant *initializer = ConstantStruct::get(
+            structWithRedzoneType, {zeroInit, GV->getInitializer(), zeroInit}
+        );
+        newGV->setInitializer(initializer);
+        newGV->setAlignment(Align(32)); // 32바이트 정렬 설정
+
+        // 기존 전역 변수 참조 교체
+        GV->replaceAllUsesWith(ConstantExpr::getInBoundsGetElementPtr(
+            structWithRedzoneType, newGV,
+            {ConstantInt::get(Type::getInt32Ty(Context), 0),
+                ConstantInt::get(Type::getInt32Ty(Context), 1)}
+        ));
+
+        GV->eraseFromParent(); // 기존 전역 변수 삭제
+    }
+
+    // configure_mpu_redzone_for_global 함수 호출 삽입
+    FunctionCallee mpuFunc = M.getOrInsertFunction(
+        "configure_mpu_redzone_for_global",
+        Type::getVoidTy(Context),
+        Type::getInt8PtrTy(Context), // 전역 변수 주소 매개변수 타입 (i8*)
+        Type::getInt64Ty(Context)     // 전역 변수 크기 매개변수 타입 (i64)
+    );
+
+    ////////////////////////////
+    // 전역 변수 접근 변경 탐지 //
+    ////////////////////////////
     for (auto &GV : M->globals()) {
         globalVars.insert(&GV);
         errs() << "Tracking global variable: " << GV.getName() << "\n";
@@ -179,7 +285,9 @@ PreservedAnalyses GlobalVariableMPUPass::run(Function &F,
             for (auto &I : BB) {
                 // load 명령어에서 전역 변수 접근 탐지
                 if (auto *LI = dyn_cast<LoadInst>(&I)) {
-                    CheckGlobalVariableAccessChanged(LI->getPointerOperand(), &I);
+                    if(CheckGlobalVariableAccessChanged(LI->getPointerOperand(), &I)){
+
+                    }
                 }
                 // store 명령어에서 전역 변수 접근 탐지
                 else if (auto *SI = dyn_cast<StoreInst>(&I)) {
@@ -197,6 +305,17 @@ bool GlobalVariableMPUPass::isGlobalVariable(Value *ptr){
         return globalVars.count(GV) > 0;
     }
     return false;
+}
+
+// 초기화된 상수가 아닌 전역 변수인지 확인하고 포인터 반환
+GlobalVariable* istInitializedNonConstantGlobalVariable(Value *ptrOperand) {
+    if (auto *GV = dyn_cast<GlobalVariable>(ptrOperand)) {
+        // 전역 변수가 초기화된 상수가 아닌지 확인
+        if (GV->hasInitializer() && !GV->isConstant()) {
+            return GV;
+        }
+    }
+    return nullptr;
 }
 
 bool GlobalVariableMPUPass::CheckGlobalVariableAccessChanged(Value *currentPtr, Instruction *I){
