@@ -14,8 +14,14 @@
 #define ALIGNMENT 32
 #define REDZONE_SIZE ARM_MPU_REGION_SIZE_64B
 
+#include <stdlib.h> 
 #include <stdint.h>
 #include <stdio.h>
+
+uint8_t tag_generator();
+uint8_t* get_tag_address(uint32_t address);
+void set_tag(void *address, uint8_t tag);
+uint8_t get_tag(void *address);
 
 typedef struct {
     size_t size;        // 힙 객체의 크기 정보

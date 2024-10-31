@@ -103,11 +103,12 @@ private:
     bool isGlobalVariable(Value *ptr);
 
      /*
-        @description: 정리 필요
+        @description: 포인터가 초기화된 상수가 아닌 전역 변수인지 확인
         @input
-            - Value *ptrOperand: 정리 필요
+            - Value *ptrOperand: 검사 대상 포인터
         @output
-            - 1: 포인터가 전역 변수임
+            - 1: 포인터가 초기화된 상수가 아닌 전역 변수임
+            - 0: 포인터가 초기화된 상수가 아닌 전역 변수가 아님
     */ 
     GlobalVariable* istInitializedNonConstantGlobalVariable(Value *ptrOperand);
  

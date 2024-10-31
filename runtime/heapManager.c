@@ -7,6 +7,7 @@
 #include "runtimeConfig.h"
 
 
+// Todo: UAF 방지용 poisoned 구현
 
 void* my_malloc(size_t size) {
     // 필요한 메모리 크기 계산 (요청 크기 + 메타데이터 크기 + 레드존 * 2 + 정렬 여유 공간)
@@ -32,6 +33,13 @@ void* my_malloc(size_t size) {
     metadata->size = size;
     metadata->raw_ptr = (void*)raw_ptr;  // 메모리 해제 시 사용할 실제 시작 주소 저장
 
+    // 태그 설정
+    // 우선 전체 할당 범위에만 태그 부여
+    uint8_t tag = tag_generator();
+    for(auto i = aligned_ptr ; i < (aligned_ptr + size) ; i += 8){
+        set_tag(i, tag);
+    }
+
     // 앞뒤 레드존 설정
     for (size_t i = 0; i < REDZONE_SIZE / 2; i++) {
         ((uint8_t*)raw_ptr)[i] = 0xAA;  // 앞쪽 레드존 패턴 설정
@@ -50,6 +58,8 @@ void my_free(void* ptr) {
     // 힙 객체의 시작 및 끝 주소 계산
     uintptr_t start_address = (uintptr_t)ptr;
     uintptr_t end_address = start_address + metadata->size;
+
+    // 태그 삭제
 
     // 전체 메모리 블록 해제
     free(metadata->raw_ptr);  // 메타데이터에 저장된 실제 시작 주소로 전체 블록 해제

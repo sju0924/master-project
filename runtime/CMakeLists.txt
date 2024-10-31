@@ -36,6 +36,8 @@ link_directories(${CMAKE_SYSROOT}/lib)
 set(RUNTIME_SRCS
     testPrint.c
     MPU.c
+    tagManager.c
+    heapManager.c
 )
 
 # OBJECT 라이브러리 생성
