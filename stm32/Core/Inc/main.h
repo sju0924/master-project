@@ -70,6 +70,7 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 void uart_send_string(const char *str);
+void uart_send_string_char(char *str, size_t size) ;
 
 /* USER CODE END EFP */
 

@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "application.h"
 #include <string.h>
 
 /* Private includes ----------------------------------------------------------*/
@@ -98,7 +99,7 @@ static void MX_USB_PCD_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-int num1 = 10;
+
 /* USER CODE END 0 */
 
 /**
@@ -173,32 +174,7 @@ int main(void)
   // Disable MPU if no further configuration is needed or keep it enabled as required
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 
-  num1 = 100;
-  char *allocation_test1 = (char *)malloc(sizeof(char)*10);
-  char *allocation_test2 = (char *)malloc(sizeof(char)*10);
-  char j = 'A';
-  for (int i = 0 ; i<9; i++){
-    allocation_test1[i] = j;
-    j++;
-  }
-  allocation_test1[9]='\0';
-
-  for (int i = 0 ; i<9; i++){
-    allocation_test2[i] = j;
-    j++;
-  }
-  allocation_test2[9]='\0';
-
-
-  allocation_test1[3]='Z';
-  allocation_test2[4]='Z';
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);        
-  HAL_UART_Transmit(&huart1, (uint8_t*)allocation_test1, strlen(allocation_test1), HAL_MAX_DELAY);
-  HAL_UART_Transmit(&huart1, (uint8_t*)allocation_test2, strlen(allocation_test2), HAL_MAX_DELAY);
-
-  free(allocation_test1);
-  free(allocation_test2);
-
+  test_heap_allocation();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -207,17 +183,7 @@ int main(void)
   while (1)
   {
     
-        char msg1[] = "Going on...";
-        char msg2[] = "Going off...";
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);        
-        HAL_UART_Transmit(&huart1, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
-        HAL_Delay(500);  // 500ms 대기
-
-
-        // LED Off
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-        HAL_UART_Transmit(&huart1, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
-        HAL_Delay(500);  // 500ms 대기
+        test_uart_print();
 
         
     
@@ -1204,3 +1170,8 @@ void assert_failed(uint8_t *file, uint32_t line)
 void uart_send_string(const char *str) {
     HAL_UART_Transmit(&huart1, (uint8_t*)str, strlen(str), HAL_MAX_DELAY);
 }
+
+void uart_send_string_char(char *str, size_t size) {
+    HAL_UART_Transmit(&huart1, (uint8_t*)str, size, HAL_MAX_DELAY);
+}
+
