@@ -36,6 +36,7 @@ BUILD_DIR = build
 ######################################
 # C sources
 C_SOURCES =  \
+Core/Src/main.c \
 Core/Src/stm32l5xx_it.c \
 Core/Src/stm32l5xx_hal_msp.c \
 Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_utils.c \
@@ -226,9 +227,10 @@ $(BUILD_DIR)/stm32l5xx_hal_pcd.ll \
 $(BUILD_DIR)/stm32l5xx_hal_pcd_ex.ll \
 $(BUILD_DIR)/stm32l5xx_ll_usb.ll \
 $(BUILD_DIR)/system_stm32l5xx.ll \
+$(BUILD_DIR)/main.ll 
 
-APPLICATION_LL_FILES = $(BUILD_DIR)/main.ll 
-APPLICATION_C_SOURCES = Core/Src/main.c \
+APPLICATION_LL_FILES = $(BUILD_DIR)/application.ll 
+APPLICATION_C_SOURCES = Core/Src/application.c \
 # default action: build all
 all: $(LL_FILE)
 direct: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin
