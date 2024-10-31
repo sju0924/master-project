@@ -4,14 +4,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include "runtimeConfig.h"
 
-#define ALIGNMENT 32
-#define REDZONE_SIZE  64
 
-typedef struct {
-    size_t size;        // 힙 객체의 크기 정보
-    void* raw_ptr;      // 할당된 메모리 블록의 실제 시작 주소
-} HeapObject;
 
 void* my_malloc(size_t size) {
     // 필요한 메모리 크기 계산 (요청 크기 + 메타데이터 크기 + 레드존 * 2 + 정렬 여유 공간)

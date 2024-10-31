@@ -109,7 +109,7 @@ private:
         @output
             - 1: 포인터가 전역 변수임
     */ 
-    GlobalVariable* istInitializedNonConstantGlobalVariable(Value *ptrOperand)
+    GlobalVariable* istInitializedNonConstantGlobalVariable(Value *ptrOperand);
  
 }; 
 
