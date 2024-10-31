@@ -20,9 +20,19 @@ uint8_t* get_tag_address(uint32_t address) {
     return (uint8_t *)(SHADOW_MEM_START + offset);
 }
 
-void set_tag(void *address, uint8_t tag) {
-    uint8_t *tag_address = get_tag_address((uint32_t)address);
-    *tag_address = tag;
+void set_tag(void *address, size_t size) {
+    uint8_t *tag_address = get_tag_address((uintptr_t)address);
+    uint8_t tag = tag_generator();
+
+    // 8바이트 단위로 태그 설정
+    for (size_t i = 0; i < size / 8; i++) {
+        *tag_address++ = tag;
+    }
+
+    // 남은 바이트가 있을 경우 마지막 태그 설정
+    if (size % 8 != 0) {
+        *tag_address = tag;
+    }
 }
 
 uint8_t get_tag(void *address) {

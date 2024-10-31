@@ -10,6 +10,7 @@ link_directories(${CMAKE_SYSROOT}/lib)
 
 add_library(TestPass MODULE TestPass.cpp)
 add_library(MPUPass MODULE mpupass.cpp)
+add_library(TagPass MODULE mpupass.cpp)
 
 # 필요한 라이브러리 연결
 target_link_libraries(TestPass PRIVATE c++ m LLVM)

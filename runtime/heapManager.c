@@ -6,6 +6,11 @@
 #include <stdint.h>
 #include "runtimeConfig.h"
 
+// poison_queue 최대 크기 설정
+constexpr size_t POISON_QUEUE_MAX_SIZE = 3;
+
+// 지연 해제 대기열을 위한 전역 deque
+static std::deque<HeapMetadata*> poison_queue;
 
 // Todo: UAF 방지용 poisoned 구현
 
@@ -36,9 +41,10 @@ void* my_malloc(size_t size) {
     // 태그 설정
     // 우선 전체 할당 범위에만 태그 부여
     uint8_t tag = tag_generator();
-    for(auto i = aligned_ptr ; i < (aligned_ptr + size) ; i += 8){
-        set_tag(i, tag);
+    for (uintptr_t i = aligned_ptr; i < (aligned_ptr + size); i += 8) {
+        set_tag((void*)i, tag);
     }
+
 
     // 앞뒤 레드존 설정
     for (size_t i = 0; i < REDZONE_SIZE / 2; i++) {
@@ -49,6 +55,22 @@ void* my_malloc(size_t size) {
     // 32바이트 정렬된 메모리 블록의 시작 위치 반환
     return (void*)aligned_ptr;
 }
+
+// 지연 해제 큐에서 가장 오래된 블록을 해제하는 함수
+void release_oldest_poisoned() {
+    if (!poison_queue.empty()) {
+        HeapMetadata* oldest_metadata = poison_queue.front();
+        poison_queue.pop_front();
+
+        // 메모리 범위 태그 해제
+        uintptr_t start_address = (uintptr_t)oldest_metadata + sizeof(HeapMetadata) + (REDZONE_SIZE / 2);
+        uintptr_t end_address = start_address + oldest_metadata->size;
+        for (uintptr_t i = start_address; i < end_address; i += 8) {
+            set_tag((void*)i, 0x00);  // 태그 해제
+        }
+    }
+}
+
 void my_free(void* ptr) {
     if (!ptr) return;  // NULL 포인터에 대한 보호
 
@@ -60,6 +82,17 @@ void my_free(void* ptr) {
     uintptr_t end_address = start_address + metadata->size;
 
     // 태그 삭제
+    for (uintptr_t i = start_address; i < end_address; i += 8) {
+        set_tag((void*)i, 0xFF);
+    }
+
+     // 큐가 가득 차면 가장 오래된 메모리 블록 해제
+    if (poison_queue.size() >= POISON_QUEUE_MAX_SIZE) {
+        release_oldest_poisoned();
+    }
+
+    // 지연 해제 대기열에 현재 메타데이터 추가
+    poison_queue.push_back(metadata);
 
     // 전체 메모리 블록 해제
     free(metadata->raw_ptr);  // 메타데이터에 저장된 실제 시작 주소로 전체 블록 해제
