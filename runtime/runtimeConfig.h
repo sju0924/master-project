@@ -1,3 +1,6 @@
+#ifndef RUNTIME_CONFIG_H
+#define RUNTIME_CONFIG_H
+
 #define ARM_MPU_REGION_SIZE_32B      ((uint8_t)0x04U) ///!< MPU Region Size 32 Bytes
 #define ARM_MPU_REGION_SIZE_64B      ((uint8_t)0x05U) ///!< MPU Region Size 64 Bytes
 #define ARM_MPU_REGION_SIZE_128B     ((uint8_t)0x06U) ///!< MPU Region Size 128 Bytes
@@ -14,16 +17,16 @@
 #define ALIGNMENT 32
 #define REDZONE_SIZE ARM_MPU_REGION_SIZE_64B
 
+
 #include <stdlib.h> 
 #include <stdint.h>
 #include <stdio.h>
+#include <time.h>
 
-uint8_t tag_generator();
-uint8_t* get_tag_address(uint32_t address);
-void set_tag(void *address, uint8_t tag);
-uint8_t get_tag(void *address);
 
 typedef struct {
     size_t size;        // 힙 객체의 크기 정보
     void* raw_ptr;      // 할당된 메모리 블록의 실제 시작 주소
 } HeapMetadata;
+
+#endif  // RUNTIME_CONFIG_H
