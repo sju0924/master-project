@@ -35,7 +35,6 @@ link_directories(${CMAKE_SYSROOT}/lib)
 # 소스 파일 설정
 set(RUNTIME_SRCS
     testPrint.c
-    MPU.c
     tagManager.c
     heapManager.c
 )
