@@ -18,7 +18,7 @@ void test_uart_print(){
 }
 
 void test_heap_allocation(){
-num1 = 100;
+    num1 = 100;
   char *allocation_test1 = (char *)malloc(sizeof(char)*10);
   char *allocation_test2 = (char *)malloc(sizeof(char)*10);
   char j = 'A';

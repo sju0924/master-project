@@ -66,26 +66,37 @@ PreservedAnalyses GlobalVariableTagPass::run(Function &F, FunctionAnalysisManage
         Type::getInt64Ty(M->getContext())                      // 크기 (i64)
     );
 
+     // 초기화 함수 생성
+    Function *initFunc = Function::Create(
+        FunctionType::get(Type::getVoidTy(context), false),
+        GlobalValue::InternalLinkage,
+        "__global_var_init",
+        M
+    );
+    BasicBlock *entry = BasicBlock::Create(context, "entry", initFunc);
+    IRBuilder<> Builder(entry);
+
+
     // 모듈의 모든 전역 변수를 순회하며 `set_tag` 호출 삽입
     for (auto &G : M->globals()) {
         if (G.isDeclaration()) continue;
 
         // 전역 변수 이름과 크기 가져오기
         uint32_t size = M->getDataLayout().getTypeAllocSize(G.getValueType());
+        
+        // `set_tag` 함수 호출 삽입
+        Value *Addr = Builder.CreateBitCast(&G, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
+        Value *Size = Builder.getInt32(size);
+        Builder.CreateCall(setTag, {Addr, Size});
 
-        // `set_tag` 호출 삽입 - `main` 함수의 시작 위치
-        Function *mainFunc = M->getFunction("main");
-        if (mainFunc) {
-            IRBuilder<> Builder(&*mainFunc->getEntryBlock().getFirstInsertionPt());
-
-            // `set_tag` 함수 호출 삽입
-            Value *Addr = Builder.CreateBitCast(&G, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
-            Value *Size = Builder.getInt32(size);
-            Builder.CreateCall(setTag, {Addr, Size});
-            Modified = true;
-        }
+        errs() << "Tagged global variable: " << G.getName() << " Addr: " << &G << " Size: " << size << "\n";
+        Modified = true;
+        
     }
+    Builder.CreateRetVoid();
 
+    // 초기화 함수를 `llvm.global_ctors`에 추가하여 프로그램 시작 시 호출되도록 설정
+    appendToGlobalCtors(*M, initFunc, 0);
 
     return (Modified ? PreservedAnalyses::none() : PreservedAnalyses::all());
     
@@ -96,7 +107,7 @@ PreservedAnalyses GlobalVariableTagPass::run(Function &F, FunctionAnalysisManage
 
 // LLVM 18에 맞춘 패스 등록 코드
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginInfo() {
-    return {LLVM_PLUGIN_API_VERSION, "StackTagPass", LLVM_VERSION_STRING,
+    return {LLVM_PLUGIN_API_VERSION, "TagPasses", LLVM_VERSION_STRING,
             [](PassBuilder &PB) {
                 PB.registerPipelineParsingCallback(
                     [](StringRef Name, FunctionPassManager &FPM,
