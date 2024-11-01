@@ -47,23 +47,17 @@ PreservedAnalyses StackTagPass::run(Function &F, FunctionAnalysisManager &AM) {
 };
 
     // `run` 메서드는 Function 단위로 실행됨
-PreservedAnalyses GlobalVariableTagPass::run(Function &F, FunctionAnalysisManager &AM) {
-    LLVMContext &context = F.getContext();
-    Module *M = F.getParent();
-
-    // 'set_tag' 함수에는 이 패스를 적용하지 않도록 제외
-    if (F.getName() == "set_tag") {
-        return PreservedAnalyses::all();
-    }
+PreservedAnalyses GlobalVariableTagPass::run(Module &M, ModuleAnalysisManager &AM) {
+    LLVMContext &context = M.getContext();
 
     bool Modified = false;
 
-    FunctionCallee setTag = M->getOrInsertFunction(
+    FunctionCallee setTag = M.getOrInsertFunction(
         "set_tag",
-        Type::getVoidTy(M->getContext()),
-        PointerType::get(Type::getInt8Ty(M->getContext()), 0), // 주소 (i8*)
-        Type::getInt8Ty(M->getContext()),                      // 태그 (i8)
-        Type::getInt64Ty(M->getContext())                      // 크기 (i64)
+        Type::getVoidTy(M.getContext()),
+        PointerType::get(Type::getInt8Ty(M.getContext()), 0), // 주소 (i8*)
+        Type::getInt8Ty(M.getContext()),                      // 태그 (i8)
+        Type::getInt64Ty(M.getContext())                      // 크기 (i64)
     );
 
      // 초기화 함수 생성
@@ -78,14 +72,14 @@ PreservedAnalyses GlobalVariableTagPass::run(Function &F, FunctionAnalysisManage
 
 
     // 모듈의 모든 전역 변수를 순회하며 `set_tag` 호출 삽입
-    for (auto &G : M->globals()) {
+    for (auto &G : M.globals()) {
         if (G.isDeclaration()) continue;
 
         // 전역 변수 이름과 크기 가져오기
-        uint32_t size = M->getDataLayout().getTypeAllocSize(G.getValueType());
+        uint32_t size = M.getDataLayout().getTypeAllocSize(G.getValueType());
         
         // `set_tag` 함수 호출 삽입
-        Value *Addr = Builder.CreateBitCast(&G, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
+        Value *Addr = Builder.CreateBitCast(&G, PointerType::get(Type::getInt8Ty(context), 0));
         Value *Size = Builder.getInt32(size);
         Builder.CreateCall(setTag, {Addr, Size});
 
@@ -96,7 +90,7 @@ PreservedAnalyses GlobalVariableTagPass::run(Function &F, FunctionAnalysisManage
     Builder.CreateRetVoid();
 
     // 초기화 함수를 `llvm.global_ctors`에 추가하여 프로그램 시작 시 호출되도록 설정
-    appendToGlobalCtors(*M, initFunc, 0);
+    appendToGlobalCtors(M, initFunc, 0);
 
     return (Modified ? PreservedAnalyses::none() : PreservedAnalyses::all());
     
@@ -116,8 +110,14 @@ extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginIn
                             FPM.addPass(StackTagPass());
                             return true;
                         }
-                        else if (Name == "global-variable-tag-pass") {
-                            FPM.addPass(GlobalVariableTagPass());
+                        return false;
+                    });
+                
+                PB.registerPipelineParsingCallback(
+                    [](StringRef Name, ModulePassManager &MPM,
+                       ArrayRef<PassBuilder::PipelineElement>) {
+                        if (Name == "global-variable-tag-pass") {
+                            MPM.addPass(GlobalVariableTagPass());
                             return true;
                         }
                         return false;

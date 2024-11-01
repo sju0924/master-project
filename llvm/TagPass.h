@@ -25,7 +25,7 @@ public:
 struct GlobalVariableTagPass : public PassInfoMixin<GlobalVariableTagPass> {
 public: 
 
-    PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
+    PreservedAnalyses run(Module &F, ModuleAnalysisManager &AM);
     static StringRef name() { return "GlobalVariableTagPass"; }
 
 private:
