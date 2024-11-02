@@ -56,8 +56,7 @@ PreservedAnalyses GlobalVariableTagPass::run(Module &M, ModuleAnalysisManager &A
         "set_tag",
         Type::getVoidTy(M.getContext()),
         PointerType::get(Type::getInt8Ty(M.getContext()), 0), // 주소 (i8*)
-        Type::getInt8Ty(M.getContext()),                      // 태그 (i8)
-        Type::getInt64Ty(M.getContext())                      // 크기 (i64)
+        Type::getInt32Ty(M.getContext())                      // 크기 (i32)
     );
 
      // 초기화 함수 생성
