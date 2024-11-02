@@ -5,6 +5,9 @@ PreservedAnalyses StackMPUPass::run(Function &F,
   errs() << "Analyzing function: " << F.getName() << "\n";
 
     
+    if (F.getName() == "configure_mpu_redzone_for_call" || F.getName() == "configure_mpu_redzone_for_return") {
+        return PreservedAnalyses::none();
+    }
     // 함수 실행 시 Stack Redzone 설정
     Module *M = F.getParent();
 
@@ -30,10 +33,24 @@ PreservedAnalyses StackMPUPass::run(Function &F,
         FunctionType::get(Type::getVoidTy(context), false),
         "add rsp, 72", "", true);
 
-        for (auto &BB : F) {
+    for (auto &BB : F) {
         for (auto I = BB.begin(); I != BB.end(); ++I) {
             // CallInst를 통해 함수 호출 감지
             if (CallInst *CI = dyn_cast<CallInst>(&*I)) {
+                if (Function *calledFunc = CI->getCalledFunction()) {
+                    if (calledFunc->getName() == "configure_mpu_redzone_for_call" ||
+                        calledFunc->getName() == "configure_mpu_redzone_for_return") {
+                        continue;
+                    }
+
+                    errs() << "  Function call detected: " 
+                           << F.getName() << " calls " 
+                           << calledFunc->getName() << "\n";
+                } else {
+                    errs() << "  Indirect function call detected in function: " 
+                           << F.getName() << "\n";
+                }  
+                
                 // 함수 호출 전: "sub rsp, 64" 삽입
                 IRBuilder<> BuilderBefore(CI);
                 BuilderBefore.SetInsertPoint(CI); 
@@ -46,19 +63,11 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                     BuilderAfter.CreateCall(AddRSP);
                 }
                 --I; 
-                
+
+                              
                 // Restore iterator to point at the original call
                 IRBuilder<> BuilderRedzone(CI->getNextNode());
                 BuilderRedzone.CreateCall(configureMPURedzoneForCall);
-
-                if (Function *calledFunc = CI->getCalledFunction()) {
-                    errs() << "  Function call detected: " 
-                           << F.getName() << " calls " 
-                           << calledFunc->getName() << "\n";
-                } else {
-                    errs() << "  Indirect function call detected in function: " 
-                           << F.getName() << "\n";
-                }
             }
 
             // Return analysis: ReturnInst를 통해 함수 리턴 감지
@@ -229,6 +238,10 @@ PreservedAnalyses GlobalVariableMPUPass::run(Module &M, ModuleAnalysisManager &A
     for (GlobalVariable *GV : globalsToReplace) {
         Type *originalType = GV->getValueType();
         uint64_t globalSize = dataLayout.getTypeAllocSize(originalType); // 전역 변수 크기 계산
+
+        if (GV && GV->getName().str().find("_with_redzone") != std::string::npos){
+            continue;
+        }
 
         // 전역 변수 + 레드존을 포함하는 새로운 구조체 타입 생성
         StructType *structWithRedzoneType = StructType::create(
