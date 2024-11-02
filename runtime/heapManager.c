@@ -48,19 +48,6 @@ void* my_malloc(size_t size) {
     return (void*)aligned_ptr;
 }
 
-// 지연 해제 큐에서 가장 오래된 블록을 해제하는 함수
-void release_oldest_poisoned() {
-    if (poison_queue[poison_queue_index] != NULL) {
-        HeapMetadata* oldest_metadata = poison_queue[poison_queue_index];
-
-        // 메모리 범위 태그 해제
-        uintptr_t start_address = ((uintptr_t)oldest_metadata + sizeof(HeapMetadata) + (REDZONE_SIZE / 2) + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
-        uintptr_t end_address = start_address + oldest_metadata->size;
-        for (uintptr_t i = start_address; i < end_address; i += 8) {
-            set_tag((void*)i, 0x00);  // 태그 해제
-        }
-    }
-}
 
 void my_free(void* ptr) {
     if (!ptr) return;  // NULL 포인터에 대한 보호
@@ -78,12 +65,9 @@ void my_free(void* ptr) {
         set_tag((void*)i, POISON_TAG);
     }
 
-    // 지연 해제 대기열에서 가장 오래된 데이터 삭제
-    release_oldest_poisoned();
+    // Free된 영역에 대한 MPU 보호 설정
+    configure_mpu_for_poison((void *)start_address, metadata->size);
 
-    // 지연 해제 대기열에 현재 메타데이터 추가
-    poison_queue[poison_queue_index++] = metadata;
-    poison_queue_index = poison_queue_index % POISON_QUEUE_MAX_SIZE;
 
     // 전체 메모리 블록 해제
     free(metadata->raw_ptr);  // 메타데이터에 저장된 실제 시작 주소로 전체 블록 해제
