@@ -203,25 +203,23 @@ bool HeapMPUPass::checkHeapAccessChanged(Value *currentPtr, Instruction *I) {
 }
 
 
-PreservedAnalyses GlobalVariableMPUPass::run(Function &F,
-                                      FunctionAnalysisManager &AM) {
+PreservedAnalyses GlobalVariableMPUPass::run(Module &M, ModuleAnalysisManager &AM) {
     
     /////////////////////////////
     // 전역 변수에 REDZONE 삽입 //
     /////////////////////////////
 
     const int GLOBAL_REDZONE_SIZE = 32;
-    Module *M = F.getParent();
-    LLVMContext &context = M->getContext();
+    LLVMContext &context = M.getContext();
     Type *int8Ty = Type::getInt8Ty(context);
     ArrayType *redzoneType = ArrayType::get(int8Ty, GLOBAL_REDZONE_SIZE); // 32바이트 레드존 타입
-    const DataLayout &dataLayout = F.getParent()->getDataLayout();
+    const DataLayout &dataLayout = M.getDataLayout();
     
 
     std::vector<GlobalVariable*> globalsToReplace;
 
     // 레드존을 추가할 전역 변수 식별
-    for (GlobalVariable &GV : M->globals()) {
+    for (GlobalVariable &GV : M.globals()) {
         if (!GV.isConstant() && GV.hasInitializer()) { // 상수가 아닌 초기화된 전역 변수만 처리
             globalsToReplace.push_back(&GV);
         }
@@ -240,7 +238,7 @@ PreservedAnalyses GlobalVariableMPUPass::run(Function &F,
 
         // 새로운 전역 변수 생성
         GlobalVariable *newGV = new GlobalVariable(
-            *M,
+            M,
             structWithRedzoneType,
             GV->isConstant(),
             GV->getLinkage(),
@@ -267,7 +265,7 @@ PreservedAnalyses GlobalVariableMPUPass::run(Function &F,
     }
 
     // configure_mpu_redzone_for_global 함수 호출 삽입
-    FunctionCallee configureMPURedzoneForGlobal = M->getOrInsertFunction(
+    FunctionCallee configureMPURedzoneForGlobal = M.getOrInsertFunction(
         "configure_mpu_redzone_for_global",
         Type::getVoidTy(context),
         PointerType::get(Type::getInt8Ty(context), 0), // 전역 변수 주소 매개변수 타입 (i8*)
@@ -277,7 +275,7 @@ PreservedAnalyses GlobalVariableMPUPass::run(Function &F,
     ////////////////////////////
     // 전역 변수 접근 변경 탐지 //
     ////////////////////////////
-    for (auto &GV : M->globals()) {
+    for (auto &GV : M.globals()) {
         globalVars.insert(&GV);
         errs() << "Tracking global variable: " << GV.getName() << "\n";
     }
@@ -291,75 +289,77 @@ PreservedAnalyses GlobalVariableMPUPass::run(Function &F,
     Value *globalBodyPtr = nullptr;
     Value *runtimeBodyPtr =nullptr;
     Value *runtimeBodySize = nullptr;
-     for (auto &BB : F) {
-            for (auto &I : BB) {
-                // load 명령어에서 전역 변수 접근 탐지
-                if (auto *LI = dyn_cast<LoadInst>(&I)) {
-                    if(CheckGlobalVariableAccessChanged(LI->getPointerOperand(), &I)){
-                        if (GlobalVariable *GV = istInitializedNonConstantGlobalVariable(LI->getPointerOperand())) {
-                            // 전역 변수의 포인터를 가져옴
-                            globalPointer = GV;
+    for (auto &F : M.functions()) {
+        for (auto &BB : F) {
+                for (auto &I : BB) {
+                    // load 명령어에서 전역 변수 접근 탐지
+                    if (auto *LI = dyn_cast<LoadInst>(&I)) {
+                        if(CheckGlobalVariableAccessChanged(LI->getPointerOperand(), &I)){
+                            if (GlobalVariable *GV = istInitializedNonConstantGlobalVariable(LI->getPointerOperand())) {
+                                // 전역 변수의 포인터를 가져옴
+                                globalPointer = GV;
 
-                            // 크기: 레드존을 포함한 전체 구조체의 크기 계산
-                            uint64_t structSize = dataLayout.getTypeAllocSize(GV->getValueType());
+                                // 크기: 레드존을 포함한 전체 구조체의 크기 계산
+                                uint64_t structSize = dataLayout.getTypeAllocSize(GV->getValueType());
 
-                            // 전역 변수 본체의 포인터 추적
-                            if (auto *structType = dyn_cast<StructType>(GV->getValueType())) {
-                                if (structType->getNumElements() == 3) { // 앞 레드존, 전역 변수, 뒤 레드존
-                                    // 구조체의 두 번째 필드를 통해 전역 변수 본체에 접근
-                                    globalBodyPtr = ConstantExpr::getInBoundsGetElementPtr(
-                                        structType, GV,
-                                        ArrayRef<Constant*>{ConstantInt::get(Type::getInt32Ty(GV->getContext()), 0),  // 구조체 기본 주소
-                                        ConstantInt::get(Type::getInt32Ty(GV->getContext()), 1)}  // 두 번째 필드
-                                    );
+                                // 전역 변수 본체의 포인터 추적
+                                if (auto *structType = dyn_cast<StructType>(GV->getValueType())) {
+                                    if (structType->getNumElements() == 3) { // 앞 레드존, 전역 변수, 뒤 레드존
+                                        // 구조체의 두 번째 필드를 통해 전역 변수 본체에 접근
+                                        globalBodyPtr = ConstantExpr::getInBoundsGetElementPtr(
+                                            structType, GV,
+                                            ArrayRef<Constant*>{ConstantInt::get(Type::getInt32Ty(GV->getContext()), 0),  // 구조체 기본 주소
+                                            ConstantInt::get(Type::getInt32Ty(GV->getContext()), 1)}  // 두 번째 필드
+                                        );
 
-                                    // 전역 변수 본체의 크기 계산 (레드존 제외)
-                                    uint64_t globalBodySize = dataLayout.getTypeAllocSize(structType->getElementType(1));
+                                        // 전역 변수 본체의 크기 계산 (레드존 제외)
+                                        uint64_t globalBodySize = dataLayout.getTypeAllocSize(structType->getElementType(1));
 
-                                    // configure_mpu_redzone_for_global 호출 (IRBuilder에서 접근 가능하도록 포인터 준비)
-                                    IRBuilder<> builder(LI); // LI 위치에 빌더 설정
-                                    runtimeBodyPtr = builder.CreateBitCast(globalBodyPtr, PointerType::get(Type::getInt8Ty(GV->getContext()), 0));
-                                    runtimeBodySize = ConstantInt::get(Type::getInt64Ty(GV->getContext()), globalBodySize);
-                                    builder.CreateCall(configureMPURedzoneForGlobal, {runtimeBodyPtr, runtimeBodySize});
+                                        // configure_mpu_redzone_for_global 호출 (IRBuilder에서 접근 가능하도록 포인터 준비)
+                                        IRBuilder<> builder(LI); // LI 위치에 빌더 설정
+                                        runtimeBodyPtr = builder.CreateBitCast(globalBodyPtr, PointerType::get(Type::getInt8Ty(GV->getContext()), 0));
+                                        runtimeBodySize = ConstantInt::get(Type::getInt64Ty(GV->getContext()), globalBodySize);
+                                        builder.CreateCall(configureMPURedzoneForGlobal, {runtimeBodyPtr, runtimeBodySize});
+                                    }
+
+                                    
                                 }
-
-                                
                             }
 
                         }
                     }
-                }
-                // store 명령어에서 전역 변수 접근 탐지
-                else if (auto *SI = dyn_cast<StoreInst>(&I)) {
-                    if(CheckGlobalVariableAccessChanged(SI->getPointerOperand(), &I)){
-                         if (GlobalVariable *GV = istInitializedNonConstantGlobalVariable(SI->getPointerOperand())) {
-                            // 전역 변수의 포인터를 가져옴
-                            globalPointer = GV;
+                    // store 명령어에서 전역 변수 접근 탐지
+                    else if (auto *SI = dyn_cast<StoreInst>(&I)) {
+                        if(CheckGlobalVariableAccessChanged(SI->getPointerOperand(), &I)){
+                            if (GlobalVariable *GV = istInitializedNonConstantGlobalVariable(SI->getPointerOperand())) {
+                                // 전역 변수의 포인터를 가져옴
+                                globalPointer = GV;
 
-                            // 크기: 레드존을 포함한 전체 구조체의 크기 계산
-                            uint64_t structSize = dataLayout.getTypeAllocSize(GV->getValueType());
+                                // 크기: 레드존을 포함한 전체 구조체의 크기 계산
+                                uint64_t structSize = dataLayout.getTypeAllocSize(GV->getValueType());
 
-                            // 전역 변수 본체의 포인터 추적
-                            if (auto *structType = dyn_cast<StructType>(GV->getValueType())) {
-                                if (structType->getNumElements() == 3) { // 앞 레드존, 전역 변수, 뒤 레드존
-                                    // 구조체의 두 번째 필드를 통해 전역 변수 본체에 접근
-                                    globalBodyPtr = ConstantExpr::getInBoundsGetElementPtr(
-                                        structType, GV,
-                                        ArrayRef<Constant*>{ConstantInt::get(Type::getInt32Ty(GV->getContext()), 0),  // 구조체 기본 주소
-                                        ConstantInt::get(Type::getInt32Ty(GV->getContext()), 1)}  // 두 번째 필드
-                                    );
+                                // 전역 변수 본체의 포인터 추적
+                                if (auto *structType = dyn_cast<StructType>(GV->getValueType())) {
+                                    if (structType->getNumElements() == 3) { // 앞 레드존, 전역 변수, 뒤 레드존
+                                        // 구조체의 두 번째 필드를 통해 전역 변수 본체에 접근
+                                        globalBodyPtr = ConstantExpr::getInBoundsGetElementPtr(
+                                            structType, GV,
+                                            ArrayRef<Constant*>{ConstantInt::get(Type::getInt32Ty(GV->getContext()), 0),  // 구조체 기본 주소
+                                            ConstantInt::get(Type::getInt32Ty(GV->getContext()), 1)}  // 두 번째 필드
+                                        );
 
-                                    // 전역 변수 본체의 크기 계산 (레드존 제외)
-                                    uint64_t globalBodySize = dataLayout.getTypeAllocSize(structType->getElementType(1));
+                                        // 전역 변수 본체의 크기 계산 (레드존 제외)
+                                        uint64_t globalBodySize = dataLayout.getTypeAllocSize(structType->getElementType(1));
 
-                                    // configure_mpu_redzone_for_global 호출 (IRBuilder에서 접근 가능하도록 포인터 준비)
-                                    IRBuilder<> builder(LI); // LI 위치에 빌더 설정
-                                    Value *runtimeBodyPtr = builder.CreateBitCast(globalBodyPtr, PointerType::get(Type::getInt8Ty(GV->getContext()), 0));
-                                    Value *runtimeBodySize = ConstantInt::get(Type::getInt64Ty(GV->getContext()), globalBodySize);
-                                    builder.CreateCall(configureMPURedzoneForGlobal, {runtimeBodyPtr, runtimeBodySize});
+                                        // configure_mpu_redzone_for_global 호출 (IRBuilder에서 접근 가능하도록 포인터 준비)
+                                        IRBuilder<> builder(LI); // LI 위치에 빌더 설정
+                                        Value *runtimeBodyPtr = builder.CreateBitCast(globalBodyPtr, PointerType::get(Type::getInt8Ty(GV->getContext()), 0));
+                                        Value *runtimeBodySize = ConstantInt::get(Type::getInt64Ty(GV->getContext()), globalBodySize);
+                                        builder.CreateCall(configureMPURedzoneForGlobal, {runtimeBodyPtr, runtimeBodySize});
+                                    }
+
+                                    
                                 }
-
-                                
                             }
 
                         }
@@ -425,11 +425,17 @@ extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginIn
                     } else if (Name == "heap-mpu-pass") {
                         FPM.addPass(HeapMPUPass());
                         return true;
-                    } else if (Name == "global-variable-mpu-pass") {
-                        FPM.addPass(GlobalVariableMPUPass());
-                        return true;
-                    }
+                    } 
                     return false;
                 });
+                PB.registerPipelineParsingCallback(
+                    [](StringRef Name, ModulePassManager &MPM,
+                       ArrayRef<PassBuilder::PipelineElement>) {
+                        if (Name == "global-variable-mpu-pass") {
+                            MPM.addPass(GlobalVariableMPUPass());
+                            return true;
+                        }
+                        return false;
+                    });
         }};
 }
