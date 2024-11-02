@@ -182,6 +182,7 @@ MPU_ConfigureRegion: MPU 영역 설정
     - uint32_t access_permission: 권한
 */
 void MPU_ConfigureRegion(uint32_t region_num, uint32_t enable, uint32_t base_address, uint32_t size, uint32_t access_permission);
+uint8_t poison_queue_index = 0;
 
 void MPU_Enable(void) {
     HAL_MPU_Enable(MPU_HFNMI_PRIVDEF_NONE);
@@ -306,6 +307,29 @@ void configure_mpu_for_null_ptr(){{
 }}
 
 
+void configure_mpu_for_poison(void *ptr, uint32_t size) {
+    uintptr_t start_addr = (uintptr_t)ptr;
+    uintptr_t end_addr = start_addr + size;
+    end_addr = (end_addr + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
+
+    // 디버그
+    char buffer[100];
+    snprintf(buffer, sizeof(buffer), "Set MPU-Protected Poison:  Start address: %p, end address: %p", (void*)start_addr, (void*)end_addr);
+    uart_debug_print(buffer);
+
+    // MPU 설정
+    HAL_MPU_Disable();
+
+    if(poison_queue_index++ % POISON_QUEUE_MAX_SIZE){ //poison_queue 
+      MPU_ConfigureRegion(MPU_REGION_NUMBER6, MPU_REGION_ENABLE, start_addr, (int)(end_addr-start_addr) , MPU_PRIVILEGED_DEFAULT);
+    }
+    else{
+      MPU_ConfigureRegion(MPU_REGION_NUMBER7, MPU_REGION_ENABLE, start_addr, (int)(end_addr-start_addr) , MPU_PRIVILEGED_DEFAULT);
+    }
+
+  
+    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+}
 
 void MPU_ConfigureRegion(uint32_t region_num, uint32_t enable, uint32_t base_address, uint32_t size, uint32_t access_permission) {
     MPU_Region_InitTypeDef region;  // 지역 변수로 선언

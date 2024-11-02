@@ -41,6 +41,8 @@ void* my_malloc(size_t size) {
     // 32바이트 정렬된 메모리 블록의 시작 위치 반환
     return (void*)aligned_ptr;
 }
+
+
 void my_free(void* ptr) {
     if (!ptr) return;  // NULL 포인터에 대한 보호
 
@@ -50,6 +52,15 @@ void my_free(void* ptr) {
     // 힙 객체의 시작 및 끝 주소 계산
     uintptr_t start_address = (uintptr_t)ptr;
     uintptr_t end_address = start_address + metadata->size;
+
+    // 태그 삭제
+    for (uintptr_t i = start_address; i < end_address; i += 8) {
+        set_tag((void*)i, POISON_TAG);
+    }
+
+    // Free된 영역에 대한 MPU 보호 설정
+    configure_mpu_for_poison((void *)start_address, metadata->size);
+
 
     // 전체 메모리 블록 해제
     free(metadata->raw_ptr);  // 메타데이터에 저장된 실제 시작 주소로 전체 블록 해제
