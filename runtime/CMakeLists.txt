@@ -37,6 +37,8 @@ set(RUNTIME_SRCS
     testPrint.c
     tagManager.c
     heapManager.c
+    debugger.c
+    intrinsicFunction.c
 )
 
 # OBJECT 라이브러리 생성
