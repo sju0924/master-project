@@ -231,6 +231,7 @@ $(BUILD_DIR)/main.ll
 
 APPLICATION_LL_FILES = $(BUILD_DIR)/application.ll 
 APPLICATION_C_SOURCES = Core/Src/application.c \
+APPLICATION_FLAGS = -Dmalloc=my_malloc -Dfree=my_free -Dmemcpy=my_memcpy -Dmemset=my_memset
 # default action: build all
 all: $(LL_FILE)
 direct: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin
@@ -256,7 +257,7 @@ $(BUILD_DIR)/%.ll: %.c Makefile | $(BUILD_DIR)
 # 모든 .ll 파일을 링크하여 output.ll 생성
 $(LL_FILE): $(LL_FILES)
 	llvm-link -o drivers.ll $(LL_FILES) 
-	$(LLVM_CC) $(LLVM_FLAGS) -emit-llvm -c ${APPLICATION_C_SOURCES} -o ${APPLICATION_LL_FILES}
+	$(LLVM_CC) $(LLVM_FLAGS) $(APPLICATION_FLAGS) -emit-llvm s -c ${APPLICATION_C_SOURCES} -o ${APPLICATION_LL_FILES}
 
 $(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR) 
 	$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
