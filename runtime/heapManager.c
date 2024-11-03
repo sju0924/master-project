@@ -53,11 +53,6 @@ void my_free(void* ptr) {
     uintptr_t start_address = (uintptr_t)ptr;
     uintptr_t end_address = start_address + metadata->size;
 
-    // 태그 삭제
-    for (uintptr_t i = start_address; i < end_address; i += 8) {
-        set_tag((void*)i, POISON_TAG);
-    }
-
     // Free된 영역에 대한 MPU 보호 설정
     configure_mpu_for_poison((void *)start_address, metadata->size);
 

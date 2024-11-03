@@ -303,7 +303,7 @@ void configure_mpu_redzone_for_global(void *ptr, uint64_t size) {
 
 
 void configure_mpu_for_null_ptr(){{
-  MPU_ConfigureRegion(MPU_REGION_NUMBER7, MPU_REGION_ENABLE, 0x0, MPU_REGION_SIZE_32B , MPU_PRIVILEGED_DEFAULT);
+  MPU_ConfigureRegion(MPU_REGION_NUMBER7, MPU_REGION_ENABLE, 0x0, ARM_MPU_REGION_SIZE_32B , MPU_PRIVILEGED_DEFAULT);
 }}
 
 
