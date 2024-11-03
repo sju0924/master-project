@@ -113,4 +113,13 @@ private:
  
 }; 
 
+struct NullPtrMPUPass : public PassInfoMixin<NullPtrMPUPass> {
+public: 
+
+    PreservedAnalyses NullPtrMPUPass::run(Function &F,
+                                        FunctionAnalysisManager &AM);
+    static StringRef name() { return "NullPtrMPUPass"; }
+}
+
+
 } // namespace 

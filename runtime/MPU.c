@@ -300,6 +300,13 @@ void configure_mpu_redzone_for_global(void *ptr, uint64_t size) {
     HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 }
 
+
+void configure_mpu_for_null_ptr(){{
+  MPU_ConfigureRegion(MPU_REGION_NUMBER7, MPU_REGION_ENABLE, 0x0, MPU_REGION_SIZE_32B , MPU_PRIVILEGED_DEFAULT);
+}}
+
+
+
 void MPU_ConfigureRegion(uint32_t region_num, uint32_t enable, uint32_t base_address, uint32_t size, uint32_t access_permission) {
     MPU_Region_InitTypeDef region;  // 지역 변수로 선언
 

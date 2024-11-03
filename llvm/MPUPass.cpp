@@ -425,6 +425,29 @@ bool GlobalVariableMPUPass::CheckGlobalVariableAccessChanged(Value *currentPtr, 
     return false;
 }
 
+PreservedAnalyses NullPtrMPUPass::run(Function &F,
+                                      FunctionAnalysisManager &AM) {
+    if (F.getName() != "main") {
+            return PreservedAnalyses::all();  // main이 아닌 함수는 처리하지 않음
+        }
+
+        // 모듈에 접근
+        Module *M = F.getParent();
+
+        // 호출할 configure_mpu_for_null_ptr 함수가 모듈에 존재하는지 확인하거나 새로 생성
+        FunctionCallee MPUConfigFunc = M->getOrInsertFunction("configure_mpu_for_null_ptr",
+                                                              FunctionType::get(Type::getVoidTy(M->getContext()), false));
+
+        // main 함수의 시작 부분에 configure_mpu_for_null_ptr 호출 삽입
+        IRBuilder<> Builder(&*F.getEntryBlock().getFirstInsertionPt());
+        Builder.CreateCall(MPUConfigFunc);
+
+        return PreservedAnalyses::none();
+                                      
+}
+
+
+
 
 // 패스 플러그인 등록
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginInfo() {
@@ -438,17 +461,14 @@ extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginIn
                     } else if (Name == "heap-mpu-pass") {
                         FPM.addPass(HeapMPUPass());
                         return true;
-                    } 
+                    } else if (Name == "global-variable-mpu-pass") {
+                        FPM.addPass(GlobalVariableMPUPass());
+                        return true;
+                    } else if (Name == "null-ptr-mpu-pass") {
+                        FPM.addPass(NullPtrMPUPass());
+                        return true;
+                    }
                     return false;
                 });
-                PB.registerPipelineParsingCallback(
-                    [](StringRef Name, ModulePassManager &MPM,
-                       ArrayRef<PassBuilder::PipelineElement>) {
-                        if (Name == "global-variable-mpu-pass") {
-                            MPM.addPass(GlobalVariableMPUPass());
-                            return true;
-                        }
-                        return false;
-                    });
         }};
 }
