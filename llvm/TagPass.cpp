@@ -96,6 +96,79 @@ PreservedAnalyses GlobalVariableTagPass::run(Module &M, ModuleAnalysisManager &A
 };
 
 
+
+// Function을 받아서 분석하는 run 메서드
+PreservedAnalyses PointerArithmeticPass::run(Function &F, FunctionAnalysisManager &AM) {
+    // LoopInfo를 가져오기 위해 FunctionAnalysisManager에서 분석 정보 획득
+    auto &LI = AM.getResult<LoopAnalysis>(F);
+    Module *M = F.getParent();
+    IRBuilder<> Builder(F.getContext());
+    bool Modified = false;
+
+    // 외부 compare_tag 함수 정의 (void* 형식의 두 인자를 받음)
+    FunctionCallee CompareTagFunc = M->getOrInsertFunction(
+        "compare_tag", 
+        FunctionType::get(Type::getInt8Ty(F.getContext()), 
+                            {PointerType::get(Type::getInt8Ty(M->getContext()), 0), 
+                            PointerType::get(Type::getInt8Ty(M->getContext()), 0)}, 
+                            false)
+    );
+
+    for (auto &BB : F) {
+        // 현재 블록이 반복문에 포함되어 있는지 확인
+        Loop *L = LI.getLoopFor(&BB);
+        
+        if (L) {
+            // 반복문 내에서 첫 번째 및 마지막 접근 요소를 추적
+            Value *firstAccess = nullptr;
+            Value *lastAccess = nullptr;
+
+            for (auto &I : BB) {
+                if (auto *GEP = dyn_cast<GetElementPtrInst>(&I)) {
+                    // 첫 번째 요소 접근 시 포인터 저장
+                    if (!firstAccess) {
+                        firstAccess = GEP;
+                        errs() << "First element in loop detected: " << *GEP << "\n";
+                    }
+                    // 반복문 내 마지막 요소 접근을 계속 업데이트
+                    lastAccess = GEP;
+                }
+            }
+        
+
+            // 반복문이 끝난 후 첫 번째와 마지막 요소에 대해 태그 비교 수행
+            if (firstAccess && lastAccess) {
+                Builder.SetInsertPoint(BB.getTerminator());  // 블록의 마지막에 삽입
+
+                // 첫 번째와 마지막 포인터를 i8*로 캐스팅하여 compare_tag 호출
+                auto *CastFirst = Builder.CreateBitCast(firstAccess, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
+                auto *CastLast = Builder.CreateBitCast(lastAccess, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
+                Builder.CreateCall(CompareTagFunc, {CastFirst, CastLast});
+                
+                Modified = true;
+            }
+        }
+        else {
+            // 반복문 외부의 모든 GEP 감지
+            for (auto &I : BB) {
+                if (auto *GEP = dyn_cast<GetElementPtrInst>(&I)) {
+                    Builder.SetInsertPoint(GEP->getNextNode());
+                    Value *Addr1 = GEP->getPointerOperand();
+                    Value *Addr2 = GEP;
+                    auto *CastAddr1 = Builder.CreateBitCast(Addr1, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
+                    auto *CastAddr2 = Builder.CreateBitCast(Addr2, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
+                    Builder.CreateCall(CompareTagFunc, {CastAddr1, CastAddr2});
+
+                    errs() << "GEP outside loop detected: " << *GEP << "\n";
+                    Modified = true;;
+                }
+            }
+        }
+    }
+    
+    return (Modified ? PreservedAnalyses::none() : PreservedAnalyses::all());
+}
+
 } // namespace
 
 // LLVM 18에 맞춘 패스 등록 코드
@@ -107,6 +180,10 @@ extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginIn
                        ArrayRef<PassBuilder::PipelineElement>) {
                         if (Name == "stack-tag-pass") {
                             FPM.addPass(StackTagPass());
+                            return true;
+                        }
+                        else if (Name == "arithmetic-pointer-tag-pass") {
+                            FPM.addPass(PointerArithmeticPass());
                             return true;
                         }
                         return false;

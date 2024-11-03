@@ -9,6 +9,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h" 
+#include "llvm/Analysis/LoopInfo.h"
 #include <set>
 
 
@@ -27,6 +28,16 @@ public:
 
     PreservedAnalyses run(Module &F, ModuleAnalysisManager &AM);
     static StringRef name() { return "GlobalVariableTagPass"; }
+
+private:
+ 
+};
+
+struct PointerArithmeticPass : public PassInfoMixin<GlobalVariableTagPass> {
+public: 
+
+    PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
+    static StringRef name() { return "PointerArithmeticPass"; }
 
 private:
  
