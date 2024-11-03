@@ -11,7 +11,13 @@ uint8_t compare_tag(void* addr1, void* addr2);
 typedef enum {
     ERROR_NONE,
     ERROR_TAG_MISMATCH,
-    ERROR_MPU_VIOLATION
+    ERROR_BUFFER_OVERFLOW,
+    ERROR_BUFFER_UNDEFLOW,
+    ERROR_HEAP_OVERFLOW,
+    ERROR_HEAP_UNDERFLOW,
+    ERROR_GLOBAL_VARIABLE_OVERFLOW,
+    ERROR_GLOBAL_VARIABLE_UNDERFLOW,
+    ERROR_USE_AFTER_FREE
 } ErrorType;
 
 // 오류 정보 구조체
@@ -24,6 +30,17 @@ typedef struct {
     uint8_t mpu_region;
     void* tag_mismatch_addr;
 } ErrorInfo;
+
+typedef struct {
+    uint32_t r0;
+    uint32_t r1;
+    uint32_t r2;
+    uint32_t r3;
+    uint32_t r12;
+    uint32_t lr;
+    uint32_t pc;
+    uint32_t xpsr;
+} ExceptionStackFrame;
 
 // 오류 로그 작성 및 출력 함수
 void log_error(ErrorInfo* info) {
@@ -67,33 +84,33 @@ void handle_tag_mismatch(void* start, void* end) {
     ErrorInfo info = {0};
     info.type = ERROR_TAG_MISMATCH;
 
-    // 현재 PC와 LR 레지스터 값 읽기
-    asm volatile ("mov %0, pc" : "=r" (info.pc));  // PC 값 얻기
-    asm volatile ("mov %0, lr" : "=r" (info.lr));  // LR 값 얻기
-
     // 태그 불일치 발생 위치 탐색
     uint8_t* current = (uint8_t*)start;
     uint8_t* last = (uint8_t*)end;
     while (current <= last) {
-        if (compare_tag(current, current) != 0) {
+        if (compare_tag(start, current) != 0) {
             info.tag_mismatch_addr = current;
             break;
         }
         current++;
     }
 
-    // 로그 작성 및 출력
-    log_error(&info);
+    //Fault 생성
+    MemManage_Handler();
 }
 
 // MPU 접근 위반 예외 처리기 (Memory Management Fault Handler)
 void MemManage_Handler(void) {
     ErrorInfo info = {0};
-    info.type = ERROR_MPU_VIOLATION;
+    ExceptionStackFrame *stack_frame;
 
-    // PC와 LR 레지스터 값 읽기
-    asm volatile ("mov %0, pc" : "=r" (info.pc));  // PC 값 얻기
-    asm volatile ("mov %0, lr" : "=r" (info.lr));  // LR 값 얻기
+    // Cortex-M에서 예외 발생 시 자동으로 스택에 프레임이 생성되므로 이를 통해 접근
+    asm volatile ("mrs %0, msp" : "=r" (stack_frame));  // MSP(메인 스택 포인터)를 통해 스택 프레임 접근
+
+    info.pc = stack_frame->pc;
+    info.lr = stack_frame->lr;
+
+    info.type = ERROR_MPU_VIOLATION;
 
     // CFSR 및 MMFAR 레지스터 값 읽기
     info.cfsr = *((volatile uint32_t*)0xE000ED28);   // Configurable Fault Status Register
