@@ -71,6 +71,7 @@ void Error_Handler(void);
 /* USER CODE BEGIN EFP */
 void uart_send_string(const char *str);
 void uart_send_string_char(char *str, size_t size) ;
+void sd_card_write(const char *message);
 
 /* USER CODE END EFP */
 

@@ -25,6 +25,9 @@
 #include <stdlib.h> 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
+#include <time.h>
+
 
 
 typedef struct {
@@ -33,5 +36,6 @@ typedef struct {
 } HeapMetadata;
 
 void configure_mpu_for_poison(void *ptr, uint32_t size) ;
+void uart_debug_print(const char *str);
 
 #endif  // RUNTIME_CONFIG_H
