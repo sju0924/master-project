@@ -52,7 +52,8 @@ add_custom_target(
     DEPENDS firmware 
     COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTestPass.so -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="my-test-pass,stack-mpu-pass,heap-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/application_heap_stack_analysed.ll  ${CMAKE_BINARY_DIR}/../stm32/build/application.ll 
     COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="global-variable-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/application_output.ll  ${CMAKE_BINARY_DIR}/application_heap_stack_analysed.ll
-    COMMAND llvm-link -o output.ll ${CMAKE_BINARY_DIR}/../stm32/drivers.ll ${CMAKE_BINARY_DIR}/application_output.ll 
+    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="null-ptr-mpu-pass" -S -o  ${CMAKE_BINARY_DIR}/drivers_analysed.ll  ${CMAKE_BINARY_DIR}/../stm32/drivers.ll
+    COMMAND llvm-link -o output.ll ${CMAKE_BINARY_DIR}/drivers_analysed.ll  ${CMAKE_BINARY_DIR}/application_output.ll 
 
 )
 

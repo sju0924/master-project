@@ -10,7 +10,7 @@ PreservedAnalyses StackMPUPass::run(Function &F,
     }
     // 함수 실행 시 Stack Redzone 설정
     Module *M = F.getParent();
-
+    
     BasicBlock &EntryBlock = F.getEntryBlock();
     IRBuilder<> builder(&EntryBlock.front());
     LLVMContext &context = F.getContext();
@@ -27,11 +27,11 @@ PreservedAnalyses StackMPUPass::run(Function &F,
     // Inline assembly to adjust rsp by 64 bytes (redzone)
     InlineAsm *SubRSP = InlineAsm::get(
         FunctionType::get(Type::getVoidTy(context), false),
-        "sub rsp, 72", "", true);
+        "sub sp, 72", "", true);
 
     InlineAsm *AddRSP = InlineAsm::get(
         FunctionType::get(Type::getVoidTy(context), false),
-        "add rsp, 72", "", true);
+        "add sp, 72", "", true);
 
     for (auto &BB : F) {
         for (auto I = BB.begin(); I != BB.end(); ++I) {
@@ -39,14 +39,15 @@ PreservedAnalyses StackMPUPass::run(Function &F,
             if (CallInst *CI = dyn_cast<CallInst>(&*I)) {
                 if (Function *calledFunc = CI->getCalledFunction()) {
                     if (calledFunc->getName() == "configure_mpu_redzone_for_call" ||
-                        calledFunc->getName() == "configure_mpu_redzone_for_return") {
+                        calledFunc->getName() == "configure_mpu_redzone_for_return" ||
+                        calledFunc->getName() == "llvm.dbg.value" ) {
                         continue;
                     }
 
                     errs() << "  Function call detected: " 
-                           << F.getName() << " calls " 
-                           << calledFunc->getName() << "\n";
-                } else {
+                           << F.getName() << " calls " << calledFunc->getName() << "\n";
+                } 
+                else {
                     errs() << "  Indirect function call detected in function: " 
                            << F.getName() << "\n";
                 }  
@@ -68,23 +69,22 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                 // Restore iterator to point at the original call
                 IRBuilder<> BuilderRedzone(CI->getNextNode());
                 BuilderRedzone.CreateCall(configureMPURedzoneForCall);
-            }
+            }          
+        }
+        // Return analysis: ReturnInst를 통해 함수 리턴 감지
+        if (ReturnInst *Ret = dyn_cast<ReturnInst>(BB.getTerminator())) {
+            IRBuilder<> RetBuilder(Ret);
 
-            // Return analysis: ReturnInst를 통해 함수 리턴 감지
-            if (ReturnInst *Ret = dyn_cast<ReturnInst>(BB.getTerminator())) {
-                IRBuilder<> RetBuilder(Ret);
+            FunctionCallee configureMPURedzoneForReturn = M->getOrInsertFunction(
+                "configure_mpu_redzone_for_return",
+                Type::getVoidTy(context)  // 반환 타입 (void)
+            );
 
-                FunctionCallee configureMPURedzoneForReturn = M->getOrInsertFunction(
-                    "configure_mpu_redzone_for_return",
-                    Type::getVoidTy(context)  // 반환 타입 (void)
-                );
-
-                // 함수 리턴 후 
-                RetBuilder.SetInsertPoint(Ret);  // Ret 위치에 삽입 지점 설정
-                RetBuilder.CreateCall(configureMPURedzoneForReturn);
-                errs() << "  Return detected in function: " 
-                       << F.getName() << "\n";
-            }
+            // 함수 리턴 후 
+            RetBuilder.SetInsertPoint(Ret);  // Ret 위치에 삽입 지점 설정
+            RetBuilder.CreateCall(configureMPURedzoneForReturn);
+            errs() << "  Return detected in function: " 
+                    << F.getName() << "\n";
         }
     }
 
@@ -96,7 +96,7 @@ PreservedAnalyses HeapMPUPass::run(Function &F,
                                       FunctionAnalysisManager &AM) {
     // 함수 내 모든 명령어를 순회하며 힙 접근 검사
     Module *M = F.getParent();
-
+    bool modified = false;
     LLVMContext &context = F.getContext();
     const DataLayout &dataLayout = F.getParent()->getDataLayout();
     IRBuilder<> Builder(F.getContext());
@@ -115,7 +115,7 @@ PreservedAnalyses HeapMPUPass::run(Function &F,
                 if (CallInst *CI = dyn_cast<CallInst>(&I)) {
                     if (Function *calledFunc = CI->getCalledFunction()) {
                         StringRef funcName = calledFunc->getName();
-                        if (funcName == "malloc" || funcName == "calloc" || funcName == "realloc") {
+                        if (funcName == "my_malloc" || funcName == "calloc" || funcName == "realloc") {
                             // 힙 오브젝트 포인터와 크기를 저장
                             if (ConstantInt *size = dyn_cast<ConstantInt>(CI->getArgOperand(0))) {
                                 uint64_t allocSize = size->getZExtValue();
@@ -132,7 +132,7 @@ PreservedAnalyses HeapMPUPass::run(Function &F,
                 // 메모리 해제 함수 (free) 호출 감지
                 if (CallInst *CI = dyn_cast<CallInst>(&I)) {
                     if (Function *calledFunc = CI->getCalledFunction()) {
-                        if (calledFunc->getName() == "free") {
+                        if (calledFunc->getName() == "my_free") {
                             Value *freedPtr = CI->getArgOperand(0);
                             removeHeapObject(freedPtr);
                         }
@@ -143,20 +143,33 @@ PreservedAnalyses HeapMPUPass::run(Function &F,
                 // load/store 명령어로 힙 오브젝트 접근 감지
                 if (LoadInst *LI = dyn_cast<LoadInst>(&I)) {
                     if(checkHeapAccessChanged(LI->getPointerOperand(), &I)){
-                        Builder.SetInsertPoint(LI->getNextNode());
+                        Builder.SetInsertPoint(LI);
                         Builder.CreateCall(configureMPURedzoneForHeapAccess, lastHeapObject);
+                        modified = true;
                     }
                 } else if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
                     if(checkHeapAccessChanged(SI->getPointerOperand(), &I)){
-                        Builder.SetInsertPoint(SI->getNextNode());
+                        Builder.SetInsertPoint(SI);
                         Builder.CreateCall(configureMPURedzoneForHeapAccess, lastHeapObject);
+                        modified = true;
                     }
                 }
             }
         }
 
+    // my_malloc과 my_free 함수 선언 또는 가져오기
+    Type *Int8PtrTy = PointerType::get(Type::getInt8Ty(context), 0);  // i8* 타입 생성
+    FunctionCallee MyMallocFunc = M->getOrInsertFunction(
+        "my_malloc",
+        FunctionType::get(Int8PtrTy, { Type::getInt32Ty(context) }, false) // i32 타입으로 설정
+    );
+
+    FunctionCallee MyFreeFunc = M->getOrInsertFunction(
+        "my_free",
+        FunctionType::get(Type::getVoidTy(context), { Int8PtrTy }, false)
+    );
     // 모든 분석 정보를 보존한다고 설정
-    return PreservedAnalyses::all();
+     return modified ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 
 
@@ -244,10 +257,25 @@ PreservedAnalyses GlobalVariableMPUPass::run(Module &M, ModuleAnalysisManager &A
         }
 
         // 전역 변수 + 레드존을 포함하는 새로운 구조체 타입 생성
-        StructType *structWithRedzoneType = StructType::create(
-            {redzoneType, originalType, redzoneType}, // [앞 레드존, 전역 변수, 뒤 레드존]
-            GV->getName().str() + "_with_redzone"
-        );
+        // 필요한 패딩을 계산
+        uint64_t paddingSize = (32 - (globalSize % 32)) % 32;
+
+        // 패딩 크기만큼의 바이트 배열 타입을 정의 (0일 경우 빈 배열이 됩니다)
+        ArrayType *paddingType = ArrayType::get(Type::getInt8Ty(originalType->getContext()), paddingSize);
+
+        // 전역 변수 + 레드존 + 패딩을 포함하는 새로운 구조체 타입 생성
+        StructType *structWithRedzoneType;
+        if (paddingSize > 0) {
+            structWithRedzoneType = StructType::create(
+                {redzoneType, originalType, paddingType, redzoneType}, // [앞 레드존, 전역 변수, 패딩, 뒤 레드존]
+                GV->getName().str() + "_with_redzone"
+            );
+        } else {
+            structWithRedzoneType = StructType::create(
+                {redzoneType, originalType, redzoneType}, // 패딩이 필요 없을 때 [앞 레드존, 전역 변수, 뒤 레드존]
+                GV->getName().str() + "_with_redzone"
+            );
+        }
 
         // 새로운 전역 변수 생성
         GlobalVariable *newGV = new GlobalVariable(
@@ -261,9 +289,23 @@ PreservedAnalyses GlobalVariableMPUPass::run(Module &M, ModuleAnalysisManager &A
 
         // 기존 초기화 값 설정
         Constant *zeroInit = ConstantAggregateZero::get(redzoneType);
-        Constant *initializer = ConstantStruct::get(
-            structWithRedzoneType, {zeroInit, GV->getInitializer(), zeroInit}
-        );
+        Constant *originalInit = GV->hasInitializer() ? GV->getInitializer() : ConstantAggregateZero::get(originalType);
+
+        // 패딩 초기화 값 설정 (필요한 경우)
+        Constant *paddingInit = ConstantAggregateZero::get(paddingType);
+
+        // 초기화 값에 패딩을 포함하여 초기화 생성
+        Constant *initializer;
+        if (paddingSize > 0) {
+            initializer = ConstantStruct::get(
+                structWithRedzoneType, {zeroInit, originalInit, paddingInit, zeroInit}
+            );
+        } else {
+            initializer = ConstantStruct::get(
+                structWithRedzoneType, {zeroInit, originalInit, zeroInit}
+            );
+        }
+
         newGV->setInitializer(initializer);
         newGV->setAlignment(Align(32)); // 32바이트 정렬 설정
 
@@ -441,6 +483,7 @@ PreservedAnalyses NullPtrMPUPass::run(Function &F,
         // main 함수의 시작 부분에 configure_mpu_for_null_ptr 호출 삽입
         IRBuilder<> Builder(&*F.getEntryBlock().getFirstInsertionPt());
         Builder.CreateCall(MPUConfigFunc);
+        errs() << "Insert null ptr guard at main: " << &*F.getEntryBlock().getFirstInsertionPt() << "\n";
 
         return PreservedAnalyses::none();
                                       
@@ -461,14 +504,20 @@ extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginIn
                     } else if (Name == "heap-mpu-pass") {
                         FPM.addPass(HeapMPUPass());
                         return true;
-                    } else if (Name == "global-variable-mpu-pass") {
-                        FPM.addPass(GlobalVariableMPUPass());
-                        return true;
                     } else if (Name == "null-ptr-mpu-pass") {
                         FPM.addPass(NullPtrMPUPass());
                         return true;
                     }
                     return false;
-                });
+                }
+            );
+            PB.registerPipelineParsingCallback(
+            [](StringRef Name, ModulePassManager &MPM, ArrayRef<PassBuilder::PipelineElement>) {
+                if (Name == "global-variable-mpu-pass") {
+                    MPM.addPass(GlobalVariableMPUPass());
+                    return true;
+                }
+                return false;
+            });
         }};
 }
