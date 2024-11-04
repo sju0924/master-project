@@ -38,6 +38,7 @@ set(RUNTIME_SRCS
     MPU.c
     heapManager.c
     debugger.c
+    syscalls.c
 )
 
 # OBJECT 라이브러리 생성
