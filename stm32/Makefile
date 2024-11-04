@@ -256,14 +256,14 @@ $(BUILD_DIR)/%.ll: %.c Makefile | $(BUILD_DIR)
 # 모든 .ll 파일을 링크하여 output.ll 생성
 $(LL_FILE): $(LL_FILES)
 	llvm-link -o drivers.ll $(LL_FILES) 
-	$(LLVM_CC) $(LLVM_FLAGS) -emit-llvm -c ${APPLICATION_C_SOURCES} -o ${APPLICATION_LL_FILES}
+	$(LLVM_CC) $(LLVM_FLAGS) -emit-llvm  -Dmalloc=my_malloc -Dfree=my_free -c ${APPLICATION_C_SOURCES} -o ${APPLICATION_LL_FILES}
 
 $(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR) 
 	$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
 
 
 $(BUILD_DIR)/%.bc: %.c Makefile | $(BUILD_DIR)
-	$(CC) -emit-llvm -c $(CFLAGS) $< -o $@
+	$(CC) -c $(CFLAGS) $< -o $@
 
 
 $(BUILD_DIR)/%.o: %.s Makefile | $(BUILD_DIR)

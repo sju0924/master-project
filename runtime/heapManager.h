@@ -1,6 +1,3 @@
-#define malloc(size) my_malloc(size)
-#define free(ptr) my_free(ptr)
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>

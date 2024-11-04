@@ -3,9 +3,7 @@
 // UART 및 SD 카드 인터페이스 함수 선언
 
 void sd_card_write(const char *message);
-
-// 외부에 정의된 compare_tag 함수 선언
-uint8_t compare_tag(void* addr1, void* addr2);
+void MemManage_Handler(void);
 
 // 오류 원인 타입 정의
 typedef enum {
@@ -62,29 +60,6 @@ void log_error(ErrorInfo* info) {
     sd_card_write(log_buffer);
 }
 
-// 태그 불일치 예외 감지 함수 (태그 불일치 발생 시 호출됨)
-void handle_tag_mismatch(void* start, void* end) {
-    ErrorInfo info = {0};
-    info.type = ERROR_TAG_MISMATCH;
-
-    // 현재 PC와 LR 레지스터 값 읽기
-    asm volatile ("mov %0, pc" : "=r" (info.pc));  // PC 값 얻기
-    asm volatile ("mov %0, lr" : "=r" (info.lr));  // LR 값 얻기
-
-    // 태그 불일치 발생 위치 탐색
-    uint8_t* current = (uint8_t*)start;
-    uint8_t* last = (uint8_t*)end;
-    while (current <= last) {
-        if (compare_tag(current, current) != 0) {
-            info.tag_mismatch_addr = current;
-            break;
-        }
-        current++;
-    }
-
-    // 로그 작성 및 출력
-    log_error(&info);
-}
 
 // MPU 접근 위반 예외 처리기 (Memory Management Fault Handler)
 void MemManage_Handler(void) {
