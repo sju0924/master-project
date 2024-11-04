@@ -75,7 +75,7 @@ struct GlobalVariableMPUPass : public PassInfoMixin<GlobalVariableMPUPass> {
     // set mpu config of over/under redzone of the global object
 public: 
 
-    PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
+    PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
     static StringRef name() { return "GlobalVariableMPUPass"; }
 
 private:
@@ -112,5 +112,14 @@ private:
     GlobalVariable* istInitializedNonConstantGlobalVariable(Value *ptrOperand);
  
 }; 
+
+struct NullPtrMPUPass : public PassInfoMixin<NullPtrMPUPass> {
+public: 
+
+    PreservedAnalyses NullPtrMPUPass::run(Function &F,
+                                        FunctionAnalysisManager &AM);
+    static StringRef name() { return "NullPtrMPUPass"; }
+}
+
 
 } // namespace 
