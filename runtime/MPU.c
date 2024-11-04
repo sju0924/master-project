@@ -211,12 +211,12 @@ void configure_mpu_redzone_for_call() {
     HAL_MPU_Disable();
 
     // Red Zone 앞부분 설정 (MPU 영역 0)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER0, MPU_REGION_ENABLE, front_addr, REDZONE_SIZE, MPU_PRIVILEGED_DEFAULT);  // Red Zone 앞쪽 설정  
+    MPU_ConfigureRegion(MPU_REGION_NUMBER0, MPU_REGION_ENABLE, front_addr, REDZONE_SIZE, MPU_REGION_PRIV_RO);  // Red Zone 앞쪽 설정  
 
     // Red Zone 뒷부분 설정 (MPU 영역 1)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_ENABLE, back_addr, REDZONE_SIZE, MPU_PRIVILEGED_DEFAULT); // Red Zone 뒤쪽 설정
+    MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_ENABLE, back_addr, REDZONE_SIZE, MPU_REGION_PRIV_RO); // Red Zone 뒤쪽 설정
   
-    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+    HAL_MPU_Enable(MPU_HARDFAULT_NMI);
 }
 
 void configure_mpu_redzone_for_return() {
@@ -239,12 +239,12 @@ void configure_mpu_redzone_for_return() {
     HAL_MPU_Disable();
 
     // Red Zone 앞부분 설정 (MPU 영역 0)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER0, MPU_REGION_DISABLE, front_addr, REDZONE_SIZE, MPU_PRIVILEGED_DEFAULT);  // Red Zone 앞쪽 설정  
+    MPU_ConfigureRegion(MPU_REGION_NUMBER0, MPU_REGION_DISABLE, front_addr, REDZONE_SIZE, MPU_REGION_ALL_RO);  // Red Zone 앞쪽 설정  
 
     // Red Zone 뒷부분 설정 (MPU 영역 1)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_DISABLE, back_addr, REDZONE_SIZE, MPU_PRIVILEGED_DEFAULT); // Red Zone 뒤쪽 설정
+    MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_DISABLE, back_addr, REDZONE_SIZE, MPU_REGION_ALL_RO); // Red Zone 뒤쪽 설정
   
-    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+    HAL_MPU_Enable(MPU_HFNMI_PRIVDEF);
 }
 
 void configure_mpu_redzone_for_heap_access(void* ptr){
@@ -270,12 +270,12 @@ void configure_mpu_redzone_for_heap_access(void* ptr){
     HAL_MPU_Disable();
 
     // Red Zone 앞부분 설정 (MPU 영역 2)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER2, MPU_REGION_ENABLE, start_addr - (REDZONE_SIZE / 2), REDZONE_SIZE / 2, MPU_PRIVILEGED_DEFAULT);  // Red Zone 앞쪽 설정  
+    MPU_ConfigureRegion(MPU_REGION_NUMBER2, MPU_REGION_ENABLE, start_addr - (REDZONE_SIZE / 2), REDZONE_SIZE / 2, MPU_REGION_PRIV_RO);  // Red Zone 앞쪽 설정  
 
     // Red Zone 뒷부분 설정 (MPU 영역 3)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER3, MPU_REGION_ENABLE, end_addr, (REDZONE_SIZE / 2), MPU_PRIVILEGED_DEFAULT); // Red Zone 뒤쪽 설정
+    MPU_ConfigureRegion(MPU_REGION_NUMBER3, MPU_REGION_ENABLE, end_addr, (REDZONE_SIZE / 2), MPU_REGION_PRIV_RO); // Red Zone 뒤쪽 설정
   
-    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+    HAL_MPU_Enable(MPU_HARDFAULT_NMI);
 
 }
 
@@ -293,19 +293,13 @@ void configure_mpu_redzone_for_global(void *ptr, uint64_t size) {
     HAL_MPU_Disable();
 
     // Red Zone 앞부분 설정 (MPU 영역 4)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER4, MPU_REGION_ENABLE, start_addr - (REDZONE_SIZE / 2), REDZONE_SIZE / 2, MPU_PRIVILEGED_DEFAULT);  // Red Zone 앞쪽 설정  
+    MPU_ConfigureRegion(MPU_REGION_NUMBER4, MPU_REGION_ENABLE, start_addr - (REDZONE_SIZE / 2), REDZONE_SIZE / 2, MPU_REGION_PRIV_RO);  // Red Zone 앞쪽 설정  
 
     // Red Zone 뒷부분 설정 (MPU 영역 5)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER5, MPU_REGION_ENABLE, end_addr, (REDZONE_SIZE / 2), MPU_PRIVILEGED_DEFAULT); // Red Zone 뒤쪽 설정
+    MPU_ConfigureRegion(MPU_REGION_NUMBER5, MPU_REGION_ENABLE, end_addr, (REDZONE_SIZE / 2), MPU_REGION_PRIV_RO); // Red Zone 뒤쪽 설정
   
-    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+    HAL_MPU_Enable(MPU_HARDFAULT_NMI);
 }
-
-
-void configure_mpu_for_null_ptr(){{
-  MPU_ConfigureRegion(MPU_REGION_NUMBER7, MPU_REGION_ENABLE, 0x0, ARM_MPU_REGION_SIZE_32B , MPU_PRIVILEGED_DEFAULT);
-}}
-
 
 void configure_mpu_for_poison(void *ptr, uint32_t size) {
     uintptr_t start_addr = (uintptr_t)ptr;
@@ -320,16 +314,19 @@ void configure_mpu_for_poison(void *ptr, uint32_t size) {
     // MPU 설정
     HAL_MPU_Disable();
 
-    if(poison_queue_index++ % POISON_QUEUE_MAX_SIZE){ //poison_queue 
-      MPU_ConfigureRegion(MPU_REGION_NUMBER6, MPU_REGION_ENABLE, start_addr, (int)(end_addr-start_addr) , MPU_PRIVILEGED_DEFAULT);
-    }
-    else{
-      MPU_ConfigureRegion(MPU_REGION_NUMBER7, MPU_REGION_ENABLE, start_addr, (int)(end_addr-start_addr) , MPU_PRIVILEGED_DEFAULT);
-    }
-
-  
-    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+    
+    MPU_ConfigureRegion(MPU_REGION_NUMBER6, MPU_REGION_ENABLE, start_addr, (int)(end_addr-start_addr) , MPU_REGION_PRIV_RW);
+      
+    HAL_MPU_Enable(MPU_HARDFAULT_NMI);
 }
+
+void configure_mpu_for_null_ptr(){
+  // MPU 설정
+  HAL_MPU_Disable();
+  MPU_ConfigureRegion(MPU_REGION_NUMBER7, MPU_REGION_ENABLE, 0x0, ARM_MPU_REGION_SIZE_32B , MPU_REGION_PRIV_RO);
+  HAL_MPU_Enable(MPU_HARDFAULT_NMI);
+}
+
 
 void MPU_ConfigureRegion(uint32_t region_num, uint32_t enable, uint32_t base_address, uint32_t size, uint32_t access_permission) {
     MPU_Region_InitTypeDef region;  // 지역 변수로 선언

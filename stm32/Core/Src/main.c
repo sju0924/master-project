@@ -164,7 +164,7 @@ int main(void)
   MPU_Region_InitTypeDef MPU_InitStruct = {0};
 
   // Configure MPU Region 0 to Region 5
-    for (uint8_t region = MPU_REGION_NUMBER0; region <= MPU_REGION_NUMBER5; ++region) {
+    for (uint8_t region = MPU_REGION_NUMBER0; region <= MPU_REGION_NUMBER7; ++region) {
         MPU_InitStruct.Enable = MPU_REGION_ENABLE;
         MPU_InitStruct.Number = region;
         MPU_InitStruct.BaseAddress = 0x20000000 + (region * 0x100);      // 예시 시작 주소
