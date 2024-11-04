@@ -39,6 +39,7 @@ set(RUNTIME_SRCS
     heapManager.c
     debugger.c
     intrinsicFunction.c
+    syscalls.c
 )
 
 # OBJECT 라이브러리 생성
