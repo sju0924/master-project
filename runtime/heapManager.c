@@ -18,22 +18,11 @@ void* my_malloc(size_t size) {
     // 32바이트 정렬된 시작 주소 계산
     uintptr_t aligned_ptr = (raw_ptr + sizeof(HeapMetadata) + (REDZONE_SIZE / 2) + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
 
-    // 만약 정렬로 인해 레드존이 REDZONE_SIZE / 2가 아니게 된 경우 조정
-    size_t actual_front_redzone_size = aligned_ptr - (raw_ptr + sizeof(HeapMetadata));
-    if (actual_front_redzone_size != REDZONE_SIZE / 2) {
-        aligned_ptr += REDZONE_SIZE / 2 - actual_front_redzone_size;
-    }
 
-    // 메타데이터 설정
-    HeapMetadata* metadata = (HeapMetadata*)(aligned_ptr - sizeof(HeapMetadata) - (REDZONE_SIZE / 2));
+    // 메타데이터 설정 
+    HeapMetadata* metadata = (HeapMetadata*)((aligned_ptr - REDZONE_SIZE/2 - sizeof(HeapMetadata)) & ~(4 - 1));
     metadata->size = size;
     metadata->raw_ptr = (void*)raw_ptr;  // 메모리 해제 시 사용할 실제 시작 주소 저장
-
-    // 앞뒤 레드존 설정
-    for (size_t i = 0; i < REDZONE_SIZE / 2; i++) {
-        ((uint8_t*)raw_ptr)[i] = 0xAA;  // 앞쪽 레드존 패턴 설정
-        ((uint8_t*)(aligned_ptr + size))[i] = 0xAA;  // 뒤쪽 레드존 패턴 설정
-    }
 
     // 32바이트 정렬된 메모리 블록의 시작 위치 반환
     return (void*)aligned_ptr;

@@ -254,7 +254,7 @@ void configure_mpu_redzone_for_heap_access(void* ptr){
     }
 
     // 메타데이터 위치를 계산
-    HeapMetadata* metadata = (HeapMetadata*)((uintptr_t)ptr - (REDZONE_SIZE / 2) - sizeof(HeapMetadata));
+    HeapMetadata* metadata = (HeapMetadata*)(((uintptr_t)ptr - (REDZONE_SIZE / 2) - sizeof(HeapMetadata)) & ~(4 - 1));
 
     // 힙 객체의 시작과 끝 주소 계산
     uintptr_t start_addr = (uintptr_t)ptr;
