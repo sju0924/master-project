@@ -33,14 +33,14 @@ void my_free(void* ptr) {
     if (!ptr) return;  // NULL 포인터에 대한 보호
 
     // 메타데이터 위치 계산
-    HeapMetadata* metadata = (HeapMetadata*)((uintptr_t)ptr - (REDZONE_SIZE / 2) - sizeof(HeapMetadata));
+    HeapMetadata* metadata = (HeapMetadata*)(((uintptr_t)ptr - REDZONE_SIZE/2 - sizeof(HeapMetadata)) & ~(4 - 1));
 
     // 힙 객체의 시작 및 끝 주소 계산
     uintptr_t start_address = (uintptr_t)ptr;
     uintptr_t end_address = start_address + metadata->size;
 
     // Free된 영역에 대한 MPU 보호 설정
-    configure_mpu_for_poison((void *)start_address, metadata->size);
+    configure_mpu_for_poison((void *)(start_address), metadata->size);
 
 
     // 전체 메모리 블록 해제

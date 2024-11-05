@@ -196,8 +196,8 @@ void configure_mpu_redzone_for_call() {
     __asm__ volatile("mov %0, sp" : "=r"(sp));  // 현재 SP 가져오기
     __asm__ volatile("mov %0, r7" : "=r"(r7));  // 현재 SP 가져오기
 
-    sp = sp - 32 + sp % 32;
-    r7 = r7 + (32 - r7 % 32);
+    sp = sp & ~(uintptr_t)(ALIGNMENT - 1);
+    r7 = (r7 + ALIGNMENT - 1) & ~(uintptr_t)(ALIGNMENT - 1);
 
     // Red Zone의 앞뒤 주소 계산
     uint32_t front_addr = sp - REDZONE_SIZE; // Redzone 0이 시작되는 주소
@@ -205,7 +205,9 @@ void configure_mpu_redzone_for_call() {
 
     // 디버그
     char buffer[100];
-    snprintf(buffer, sizeof(buffer), "Stack Pointer and R7 values:  SP: %x, R7: %x", sp, r7);
+    snprintf(buffer, sizeof(buffer), "Stack Pointer and R7 values:  SP: %p, R7: %p", sp, r7);
+    uart_debug_print(buffer);
+    snprintf(buffer, sizeof(buffer), "Stack MPU started: %p, ended: %p", (void *)front_addr, (void *)back_addr);
     uart_debug_print(buffer);
 
     HAL_MPU_Disable();
@@ -224,8 +226,8 @@ void configure_mpu_redzone_for_return() {
     __asm__ volatile("mov %0, sp" : "=r"(sp));  // 현재 SP 가져오기
     __asm__ volatile("mov %0, r7" : "=r"(r7));  // 현재 SP 가져오기
 
-    sp = sp - 32 + sp % 32;
-    r7 = r7 + (32 - r7 % 32);
+    sp = sp & ~(uintptr_t)(ALIGNMENT - 1);
+    r7 = (r7 + ALIGNMENT - 1) & ~(uintptr_t)(ALIGNMENT - 1);
 
     // Red Zone의 앞뒤 주소 계산
     uint32_t front_addr = sp - REDZONE_SIZE; // Redzone 0이 시작되는 주소
@@ -263,7 +265,9 @@ void configure_mpu_redzone_for_heap_access(void* ptr){
 
     // 디버그
     char buffer[100];
-    snprintf(buffer, sizeof(buffer), "Set Heap redzone:  Start address: %p, end address: %p", (void*)start_addr, (void*)end_addr);
+    snprintf(buffer, sizeof(buffer), "Set Heap redzone:  ptr: %p, size: %d", (void*)ptr, (void*)metadata->size);
+    uart_debug_print(buffer);
+    snprintf(buffer, sizeof(buffer), "Heap MPU started: %p, ended: %p", (void *)start_addr, (void *)end_addr);
     uart_debug_print(buffer);
 
     // MPU 설정
@@ -286,7 +290,7 @@ void configure_mpu_redzone_for_global(void *ptr, uint64_t size) {
 
     // 디버그
     char buffer[100];
-    snprintf(buffer, sizeof(buffer), "Set Heap redzone:  Start address: %p, end address: %p", (void*)start_addr, (void*)end_addr);
+    snprintf(buffer, sizeof(buffer), "Set Global redzone:  Start address: %p, end address: %p", (void*)start_addr, (void*)end_addr);
     uart_debug_print(buffer);
 
     // MPU 설정
@@ -304,7 +308,7 @@ void configure_mpu_redzone_for_global(void *ptr, uint64_t size) {
 void configure_mpu_for_poison(void *ptr, uint32_t size) {
     uintptr_t start_addr = (uintptr_t)ptr;
     uintptr_t end_addr = start_addr + size;
-    end_addr = (end_addr + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
+    end_addr = (end_addr) & ~(ALIGNMENT - 1);
 
     // 디버그
     char buffer[100];
