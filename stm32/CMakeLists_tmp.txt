@@ -1,0 +1,228 @@
+# CMakeLists.txt for STM32 project
+
+cmake_minimum_required(VERSION 3.10)
+
+# Set the project name
+project(firmware C ASM)
+
+# target
+set(TARGET firmware)
+
+# Set the C standard
+set(CMAKE_C_STANDARD 11)
+set(DEBUG 1)
+
+# Set debugging options
+if(DEBUG)
+    set(CMAKE_BUILD_TYPE Debug)
+    set(OPT -Og)
+else()
+    set(CMAKE_BUILD_TYPE Release)
+    set(OPT -O2)
+endif()
+
+# set Build path
+set(BUILD_DIR build)
+
+# Include directories
+include_directories(
+    Core/Inc
+    Drivers/STM32L5xx_HAL_Driver/Inc
+    Drivers/STM32L5xx_HAL_Driver/Inc/Legacy
+    Drivers/CMSIS/Device/ST/STM32L5xx/Include
+    Drivers/CMSIS/Include
+)
+
+# Set source files
+set(C_SOURCES
+    Core/Src/main.c 
+    Core/Src/stm32l5xx_it.c 
+    Core/Src/stm32l5xx_hal_msp.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_utils.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_exti.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_adc.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_adc_ex.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_i2c.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_i2c_ex.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_rcc.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_rcc_ex.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_flash.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_flash_ex.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_flash_ramfunc.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_gpio.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_dma.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_dma_ex.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_exti.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_pwr.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_pwr_ex.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_cortex.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_icache.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_dfsdm.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_dfsdm_ex.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_fmc.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_sram.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_uart.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_uart_ex.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_ospi.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_sai.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_sai_ex.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_sdmmc.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_sd.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_sd_ex.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_spi.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_spi_ex.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_tim.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_tim_ex.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_ucpd.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_gpio.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_dma.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_pcd.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_pcd_ex.c 
+    Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_usb.c 
+    Core/Src/system_stm32l5xx.c  
+)
+
+set(ASM_SOURCES
+    startup_stm32l562xx.s
+)
+
+set(PREFIX arm-none-eabi-)
+
+# Define the target as an executable
+add_executable(${TARGET} ${C_SOURCES} ${APPLICATION_C_SOURCES} ${ASM_SOURCES})
+
+
+# Set GCC path if provided, otherwise use default
+if(GCC_PATH)
+    set(CC ${GCC_PATH}/${PREFIX}gcc)
+    set(AS "${GCC_PATH}/${PREFIX}gcc -x assembler-with-cpp")
+    set(CP ${GCC_PATH}/${PREFIX}objcopy)
+    set(SZ ${GCC_PATH}/${PREFIX}size)
+else()
+    set(CC ${PREFIX}gcc)
+    set(AS "${PREFIX}gcc -x assembler-with-cpp")
+    set(CP ${PREFIX}objcopy)
+    set(SZ ${PREFIX}size)
+endif()
+
+set(HEX "${CP} -O ihex")
+set(BIN "${CP} -O binary -S")
+
+# Define macros
+target_compile_definitions(${TARGET} PRIVATE
+    USE_FULL_LL_DRIVER
+    USE_HAL_DRIVER
+    STM32L562xx
+)
+
+# Set CPU, FPU, and float ABI
+set(CPU -mcpu=cortex-m33)
+set(FPU -mfpu=fpv4-sp-d16)
+set(FLOAT_ABI -mfloat-abi=hard)
+
+# Compile GCC flags
+set(ASFLAGS "${MCU} ${AS_DEFS} ${AS_INCLUDES} ${OPT} -Wall -fdata-sections -ffunction-sections")
+set(CFLAGS "${CFLAGS} ${MCU} ${C_DEFS} ${C_INCLUDES} ${OPT} -Wall -fdata-sections -ffunction-sections")
+
+# Toolchain and LLVM settings
+set(TARGET_TRIPLE arm-none-eabi)
+set(GCC_ARM_PATH /opt/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-eabi)
+set(LLVM_FLAGS "-O2 -emit-llvm -S --target=${TARGET_TRIPLE} ${MCU} ${C_DEFS} ${C_INCLUDES}")
+list(APPEND LLVM_FLAGS "--sysroot=${GCC_ARM_PATH}/${TARGET_TRIPLE} --gcc-toolchain=${GCC_ARM_PATH} -Wall -fdata-sections -ffunction-sections -fno-inline -fno-elide-constructors")
+
+# Debug settings
+if(DEBUG)
+    list(APPEND CFLAGS "-g -gdwarf-2")
+    list(APPEND LLVM_FLAGS "-g -gdwarf-2")
+endif()
+
+# Add dependency generation flags for GCC
+set(CFLAGS "${CFLAGS} -MMD -MP -MF\"${BUILD_DIR}/$<TARGET_OBJECTS:file>.d\"")
+
+
+# ------------ Linker script and flags ----------------------- #
+set(LINKER_SCRIPT "STM32L562xE_FLASH.ld")
+set(LIBS "-lc -lm -lnosys")
+
+target_link_options(${TARGET} PRIVATE
+    ${MCU}
+    -specs=nano.specs
+    -T${LINKER_SCRIPT}
+    -Wl,-Map=${CMAKE_BINARY_DIR}/${TARGET}.map,--cref
+    -Wl,--gc-sections
+)
+
+# Link libraries
+target_link_libraries(${TARGET} PRIVATE ${LIBS})
+target_compile_options(${TARGET} PRIVATE
+    -Wno-pointer-to-int-cast
+    -Wno-int-to-pointer-cast
+)
+
+# Set the LLVM specific variables
+set(LLVM_CC clang)
+set(LLVM_FLAGS "-O2 -emit-llvm -S --target=${TARGET_TRIPLE} -Wall -fdata-sections -ffunction-sections -fno-inline")
+set(APPLICATION_LL_FILES ${CMAKE_BINARY_DIR}/application.ll)
+set(APPLICATION_C_SOURCES Core/Src/application.c)
+
+
+# Generate .ll files
+add_custom_target(firmware_llvm ALL
+    COMMAND ${LLVM_CC} ${LLVM_FLAGS} -c ${DRIVER_SOURCES} -o ${DRIVER_LL_FILE}
+    COMMAND ${LLVM_CC} ${LLVM_FLAGS} -c ${APPLICATION_SOURCES} -o ${APPLICATION_LL_FILE}
+    DEPENDS ${C_SOURCES} ${APPLICATION_C_SOURCES}
+    COMMAND llvm-link -o ${DRIVER_LL_FILE} ${APPLICATION_LL_FILE} ${CMAKE_BINARY_DIR}/${TARGET}.ll
+    COMMENT "Generating LLVM IR (.ll) files for drivers and application"
+)
+
+
+# Assembly specific compile options
+set_source_files_properties(${ASM_SOURCES} PROPERTIES LANGUAGE ASM)
+
+# ------------ Include directories and compiler flags ------------ #
+# Compile .c to .bc
+add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/%.bc
+    COMMAND ${CC} "-c ${CFLAGS} $< -o $@"
+    DEPENDS ${CMAKE_SOURCE_DIR}/%.c
+    COMMENT "Compiling .c to .bc"
+)
+
+# Assemble .s to .o
+add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/%.o
+    COMMAND ${AS} "-c ${CFLAGS} $< -o $@"
+    DEPENDS ${CMAKE_SOURCE_DIR}/%.s
+    COMMENT "Assembling .s to .o"
+)
+
+# Link object files to create .elf
+add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/${TARGET}.elf
+    COMMAND ${CC} ${OBJECTS} ${LDFLAGS} -o $@
+    COMMAND ${SZ} $@
+    DEPENDS ${OBJECTS}
+    COMMENT "Linking .o files to create .elf"
+)
+
+# Convert .elf to .hex
+add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/${TARGET}.hex
+    COMMAND ${HEX} ${CMAKE_BINARY_DIR}/${TARGET}.elf ${CMAKE_BINARY_DIR}/${TARGET}.hex
+    DEPENDS ${CMAKE_BINARY_DIR}/${TARGET}.elf
+    COMMENT "Converting .elf to .hex"
+)
+
+# Convert .elf to .bin
+add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/${TARGET}.bin
+    COMMAND ${BIN} ${CMAKE_BINARY_DIR}/${TARGET}.elf ${CMAKE_BINARY_DIR}/${TARGET}.bin
+    DEPENDS ${CMAKE_BINARY_DIR}/${TARGET}.elf
+    COMMENT "Converting .elf to .bin"
+)
+
+# Add custom targets to trigger the build
+add_custom_target(build_elf ALL DEPENDS ${CMAKE_BINARY_DIR}/${TARGET}.elf)
+add_custom_target(build_hex ALL DEPENDS ${CMAKE_BINARY_DIR}/${TARGET}.hex)
+add_custom_target(build_bin ALL DEPENDS ${CMAKE_BINARY_DIR}/${TARGET}.bin)
+
+# Clean up
+add_custom_target(clean-all
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}
+)

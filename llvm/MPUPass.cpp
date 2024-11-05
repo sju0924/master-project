@@ -62,13 +62,19 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                 if (I != BB.end()) { // Check if iterator is still valid
                     IRBuilder<> BuilderAfter(&*I);
                     BuilderAfter.CreateCall(AddRSP);
+                    BuilderAfter.CreateCall(configureMPURedzoneForCall);
                 }
+                else{
+                    IRBuilder<> BuilderRedzone(CI->getNextNode());
+                    BuilderRedzone.CreateCall(AddRSP);
+                    BuilderRedzone.CreateCall(configureMPURedzoneForCall);
+                }
+                
                 --I; 
 
                               
                 // Restore iterator to point at the original call
-                IRBuilder<> BuilderRedzone(CI->getNextNode());
-                BuilderRedzone.CreateCall(configureMPURedzoneForCall);
+                
             }          
         }
         // Return analysis: ReturnInst를 통해 함수 리턴 감지
