@@ -19,6 +19,7 @@ typedef struct {
     uint32_t lr;
     uint32_t fault_address;
     uint32_t cfsr;
+    uint32_t xpsr;
     uint8_t mpu_region;
     void* tag_mismatch_addr;
 } ErrorInfo;
@@ -40,8 +41,8 @@ void log_error(ErrorInfo* info) {
     // 기본 오류 정보 작성
     snprintf(log_buffer, sizeof(log_buffer),
              "Error Cause: %s\r\n"
-             "PC: 0x%08X, LR: 0x%08X\r\n",
-             error_cause, info->pc, info->lr);
+             "PC: 0x%08X, LR: 0x%08X, xPSR:0x%08X\r\n",
+             error_cause, info->pc, info->lr,info->xpsr);
 
     // 추가 정보 작성
     if (info->type == ERROR_TAG_MISMATCH) {
@@ -64,12 +65,15 @@ void log_error(ErrorInfo* info) {
 // MPU 접근 위반 예외 처리기 (Memory Management Fault Handler)
 void MemManage_Handler(void) {
     ErrorInfo info = {0};
+    uint32_t *stack_ptr;
     info.type = ERROR_MPU_VIOLATION;
 
     // PC와 LR 레지스터 값 읽기
-    asm volatile ("mov %0, pc" : "=r" (info.pc));  // PC 값 얻기
-    asm volatile ("mov %0, lr" : "=r" (info.lr));  // LR 값 얻기
+    asm volatile ("mov %0, sp" : "=r" (stack_ptr));  // SP 값 얻기
 
+    info.lr = stack_ptr[5];  // Link Register
+    info.pc = stack_ptr[6];  // Program Counter
+    info.xpsr = stack_ptr[7]; // Program Status Register
     // CFSR 및 MMFAR 레지스터 값 읽기
     info.cfsr = *((volatile uint32_t*)0xE000ED28);   // Configurable Fault Status Register
     info.fault_address = *((volatile uint32_t*)0xE000ED34);  // Memory Management Fault Address Register

@@ -15,7 +15,7 @@
 #define ARM_MPU_REGION_SIZE_64KB     ((uint8_t)0x0FU) ///!< MPU Region Size 64 KBytes
 
 #define ALIGNMENT 32
-#define REDZONE_SIZE ARM_MPU_REGION_SIZE_64B
+#define REDZONE_SIZE 64
 
 // poison_queue 최대 크기 설정
 #define POISON_QUEUE_MAX_SIZE  2

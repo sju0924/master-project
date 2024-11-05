@@ -72,7 +72,7 @@ void Error_Handler(void);
 void uart_send_string(const char *str);
 void uart_send_string_char(char *str, size_t size) ;
 void sd_card_write(const char *message);
-
+void configure_mpu_for_null_ptr();
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

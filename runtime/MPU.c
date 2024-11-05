@@ -200,7 +200,7 @@ void configure_mpu_redzone_for_call() {
     r7 = (r7 + ALIGNMENT - 1) & ~(uintptr_t)(ALIGNMENT - 1);
 
     // Red Zone의 앞뒤 주소 계산
-    uint32_t front_addr = sp - REDZONE_SIZE; // Redzone 0이 시작되는 주소
+    uint32_t front_addr = sp; // Redzone 0이 시작되는 주소
     uint32_t back_addr = r7; // Redzone 1이 시작하는 주소
 
     // 디버그
@@ -213,12 +213,12 @@ void configure_mpu_redzone_for_call() {
     HAL_MPU_Disable();
 
     // Red Zone 앞부분 설정 (MPU 영역 0)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER0, MPU_REGION_ENABLE, front_addr, REDZONE_SIZE, MPU_REGION_PRIV_RO);  // Red Zone 앞쪽 설정  
+    MPU_ConfigureRegion(MPU_REGION_NUMBER0, MPU_REGION_ENABLE, front_addr - REDZONE_SIZE/2, REDZONE_SIZE/2, MPU_REGION_PRIV_RO);  // Red Zone 앞쪽 설정  
 
     // Red Zone 뒷부분 설정 (MPU 영역 1)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_ENABLE, back_addr, REDZONE_SIZE, MPU_REGION_PRIV_RO); // Red Zone 뒤쪽 설정
+    MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_ENABLE, back_addr, REDZONE_SIZE/2, MPU_REGION_PRIV_RO); // Red Zone 뒤쪽 설정
   
-    HAL_MPU_Enable(MPU_HARDFAULT_NMI);
+    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 }
 
 void configure_mpu_redzone_for_return() {
@@ -230,7 +230,7 @@ void configure_mpu_redzone_for_return() {
     r7 = (r7 + ALIGNMENT - 1) & ~(uintptr_t)(ALIGNMENT - 1);
 
     // Red Zone의 앞뒤 주소 계산
-    uint32_t front_addr = sp - REDZONE_SIZE; // Redzone 0이 시작되는 주소
+    uint32_t front_addr = sp; // Redzone 0이 시작되는 주소
     uint32_t back_addr = r7; // Redzone 1이 시작하는 주소
 
     // 디버그
@@ -241,10 +241,13 @@ void configure_mpu_redzone_for_return() {
     HAL_MPU_Disable();
 
     // Red Zone 앞부분 설정 (MPU 영역 0)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER0, MPU_REGION_DISABLE, front_addr, REDZONE_SIZE, MPU_REGION_ALL_RO);  // Red Zone 앞쪽 설정  
+    MPU_ConfigureRegion(MPU_REGION_NUMBER0, MPU_REGION_DISABLE, front_addr - REDZONE_SIZE/2, REDZONE_SIZE/2, MPU_REGION_ALL_RO);  // Red Zone 앞쪽 설정  
 
     // Red Zone 뒷부분 설정 (MPU 영역 1)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_DISABLE, back_addr, REDZONE_SIZE, MPU_REGION_ALL_RO); // Red Zone 뒤쪽 설정
+    MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_DISABLE, back_addr, REDZONE_SIZE/2, MPU_REGION_ALL_RO); // Red Zone 뒤쪽 설정
+
+    HAL_MPU_EnableRegion(MPU_REGION_NUMBER1);
+    HAL_MPU_EnableRegion(MPU_REGION_NUMBER1);
   
     HAL_MPU_Enable(MPU_HFNMI_PRIVDEF);
 }
@@ -278,8 +281,11 @@ void configure_mpu_redzone_for_heap_access(void* ptr){
 
     // Red Zone 뒷부분 설정 (MPU 영역 3)
     MPU_ConfigureRegion(MPU_REGION_NUMBER3, MPU_REGION_ENABLE, end_addr, (REDZONE_SIZE / 2), MPU_REGION_PRIV_RO); // Red Zone 뒤쪽 설정
+
+    HAL_MPU_EnableRegion(MPU_REGION_NUMBER2);
+    HAL_MPU_EnableRegion(MPU_REGION_NUMBER3);
   
-    HAL_MPU_Enable(MPU_HARDFAULT_NMI);
+    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 
 }
 
@@ -301,8 +307,11 @@ void configure_mpu_redzone_for_global(void *ptr, uint64_t size) {
 
     // Red Zone 뒷부분 설정 (MPU 영역 5)
     MPU_ConfigureRegion(MPU_REGION_NUMBER5, MPU_REGION_ENABLE, end_addr, (REDZONE_SIZE / 2), MPU_REGION_PRIV_RO); // Red Zone 뒤쪽 설정
+
+    HAL_MPU_EnableRegion(MPU_REGION_NUMBER4);
+    HAL_MPU_EnableRegion(MPU_REGION_NUMBER5);
   
-    HAL_MPU_Enable(MPU_HARDFAULT_NMI);
+    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 }
 
 void configure_mpu_for_poison(void *ptr, uint32_t size) {
@@ -320,15 +329,22 @@ void configure_mpu_for_poison(void *ptr, uint32_t size) {
 
     
     MPU_ConfigureRegion(MPU_REGION_NUMBER6, MPU_REGION_ENABLE, start_addr, (int)(end_addr-start_addr) , MPU_REGION_PRIV_RW);
+    HAL_MPU_EnableRegion(MPU_REGION_NUMBER6);
       
-    HAL_MPU_Enable(MPU_HARDFAULT_NMI);
+    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 }
 
 void configure_mpu_for_null_ptr(){
   // MPU 설정
   HAL_MPU_Disable();
-  MPU_ConfigureRegion(MPU_REGION_NUMBER7, MPU_REGION_ENABLE, 0x0, ARM_MPU_REGION_SIZE_32B , MPU_REGION_PRIV_RO);
-  HAL_MPU_Enable(MPU_HARDFAULT_NMI);
+  MPU_ConfigureRegion(MPU_REGION_NUMBER7, MPU_REGION_ENABLE, 0x0, ARM_MPU_REGION_SIZE_32B * 8 , MPU_REGION_PRIV_RO);
+  HAL_MPU_EnableRegion(MPU_REGION_NUMBER7);
+  HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+
+   // 디버그
+    char buffer[100];
+    snprintf(buffer, sizeof(buffer), "Set MPU-Protected NullPtr\r\n");
+    uart_debug_print(buffer);
 }
 
 
