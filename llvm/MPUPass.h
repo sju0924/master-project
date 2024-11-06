@@ -50,7 +50,7 @@ private:
         - 1: ptr이 해당 힙 오브젝트임 
         - 0: ptr이 해당 힙 오브젝트가 아님 
 */
-    bool _isHeapObject(Instruction *I, Value *ptr, Value *heapPtr, uint64_t size);
+    Value* _isHeapObject( Instruction *I, Value *currentPtr) ;
 
 /* 
     @description: 이전과 다른 힙 오브젝트에 접근하는지 확인하는 함수
@@ -90,17 +90,17 @@ private:
             - 1: 이전과 다른 전역 변수에 접근함
             - 0: 이전과 같은 전역 변수에 접근함
     */ 
-    bool CheckGlobalVariableAccessChanged(Value *currentPtr, Instruction *I);
+    GlobalVariable* CheckGlobalVariableAccessChanged(Value *currentPtr, Instruction *I);
 
     /*
         @description: 포인터가 전역 변수인지 확인
         @input
             - Value *ptr: 검사 대상 포인터
         @output
-            - 1: 포인터가 전역 변수임
-            - 0: 포인터가 전역 변수가 아님
+            - Value* 접근한 전역 변수 base
+
     */ 
-    bool isGlobalVariable(Value *ptr);
+    Value* isGlobalVariable(Value *ptr);
 
      /*
         @description: 정리 필요

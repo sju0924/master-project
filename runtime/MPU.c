@@ -195,14 +195,16 @@ void configure_mpu_redzone_for_call(uint32_t sp, uint32_t r7) {
 
     HAL_MPU_Disable();
 
+    char buffer[100];
+    snprintf(buffer, sizeof(buffer), "Stack Pointer and R7 values:  SP: %p, R7: %p", sp, r7);
+    uart_debug_print(buffer);
+
     // Red Zone의 앞뒤 주소 계산
     uint32_t front_addr = sp & ~(uintptr_t)(ALIGNMENT - 1); // Redzone 0이 시작되는 주소
     uint32_t back_addr = (r7 + ALIGNMENT - 1) & ~(uintptr_t)(ALIGNMENT - 1);; // Redzone 1이 시작하는 주소
 
     // 디버그
-    char buffer[100];
-    snprintf(buffer, sizeof(buffer), "Stack Pointer and R7 values:  SP: %p, R7: %p", sp, r7);
-    uart_debug_print(buffer);
+
     snprintf(buffer, sizeof(buffer), "Stack MPU started: %p, ended: %p", (void *)front_addr, (void *)back_addr);
     uart_debug_print(buffer);
 
@@ -319,7 +321,7 @@ void configure_mpu_redzone_for_global(void *ptr, uint64_t size) {
 void configure_mpu_for_poison(void *ptr, uint32_t size) {
       // MPU 설정
     HAL_MPU_Disable();
-    
+
     uintptr_t start_addr = (uintptr_t)ptr;
     uintptr_t end_addr = start_addr + size;
     end_addr = (end_addr) & ~(ALIGNMENT - 1);

@@ -184,7 +184,7 @@ int main(void)
   // Disable MPU if no further configuration is needed or keep it enabled as required
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
   configure_mpu_for_null_ptr();
-  test_heap_allocation();
+  
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -193,7 +193,7 @@ int main(void)
   while (1)
   {
     
-        test_uart_print();
+        application();
 
         
     

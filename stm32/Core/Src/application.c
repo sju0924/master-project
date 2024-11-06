@@ -1,7 +1,16 @@
 #include "main.h"
+#include "application.h"
 #include <string.h>
+#include <stdio.h>
 
 int num1 = 10;
+char log_buffer[512];
+int buffer[10];
+
+void application(){
+  test_gv_underflow();
+  test_gv_overflow();
+}
 
 void test_uart_print(){
     const char* msg1 = "Going on...";
@@ -44,4 +53,95 @@ num1 = 100;
   free(allocation_test1);
   free(allocation_test2);
 
+}
+
+
+void test_buffer_underflow(){
+  char arr[10];
+  int index = 0;
+
+  arr[0] = 1;
+  while(1){    
+    arr[index--] = 1;
+    // 기본 오류 정보 작성
+    snprintf(log_buffer, sizeof(log_buffer),
+             "Buffer underflow test: Current pc:0x%p\r\n",
+             arr + index);
+    uart_send_string(log_buffer);
+  }
+}
+
+void test_buffer_overflow(){
+  char arr[10];
+  char *ptr = arr;
+  
+
+  while(1){    
+    *ptr++ = 'A';
+    // 기본 오류 정보 작성
+    snprintf(log_buffer, sizeof(log_buffer),
+             "Buffer overflow test: Current pc:0x%p\r\n",
+             ptr);
+    uart_send_string(log_buffer);
+  }
+}
+
+
+void test_heap_underflow(){
+  int index = 0;
+  char *arr = (char *)malloc(10*sizeof(char));
+  arr[0] = 1;
+  while(1){    
+    arr[index] = 1;
+    // 기본 오류 정보 작성
+    snprintf(log_buffer, sizeof(log_buffer),
+             "Heap underflow test: Current pc:0x%p\r\n",
+             arr + index);
+    uart_send_string(log_buffer);
+    index--;
+  }
+}
+
+void test_heap_overflow(){
+  int index = 0;
+  char *arr = (char *)malloc(10*sizeof(char))  ;
+  arr[0] = 1;
+  while(1){    
+    arr[index] = 1;
+    // 기본 오류 정보 작성
+    snprintf(log_buffer, sizeof(log_buffer),
+             "Heap overflow test: Current pc:0x%p\r\n",
+             arr + index);
+    uart_send_string(log_buffer);
+    index++;
+  }
+}
+
+
+void test_gv_underflow(){
+  int index = 0;
+  
+  while(1){    
+    buffer[index] = 1;
+    // 기본 오류 정보 작성
+    snprintf(log_buffer, sizeof(log_buffer),
+             "Global variable test: Current pc:0x%p\r\n",
+             buffer + index);
+    uart_send_string(log_buffer);
+    index--;
+  }
+}
+
+void test_gv_overflow(){
+  int index = 0;
+  
+  while(1){    
+    buffer[index] = 1;
+    // 기본 오류 정보 작성
+    snprintf(log_buffer, sizeof(log_buffer),
+             "Global variable underflow test: Current pc:0x%p\r\n",
+             buffer + index);
+    uart_send_string(log_buffer);
+    index++;
+  }
 }
