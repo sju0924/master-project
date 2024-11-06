@@ -375,6 +375,7 @@ PreservedAnalyses GlobalVariableMPUPass::run(Module &M, ModuleAnalysisManager &A
     Value *runtimeBodySize = nullptr;
     for (auto &F : M.functions()) {
         for (auto &BB : F) {
+                lastGlobalVariable = nullptr;
                 for (auto &I : BB) {
                     // load 명령어에서 전역 변수 접근 탐지
                     if (auto *LI = dyn_cast<LoadInst>(&I)) {

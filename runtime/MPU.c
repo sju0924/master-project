@@ -296,13 +296,14 @@ void configure_mpu_redzone_for_global(void *ptr, uint64_t size) {
       // MPU 설정
     HAL_MPU_Disable();
 
+
     uintptr_t start_addr = (uintptr_t)ptr;
     uintptr_t end_addr = start_addr + size;
     end_addr = (end_addr + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
 
     // 디버그
     char buffer[100];
-    snprintf(buffer, sizeof(buffer), "Set Global redzone:  Start address: %p, end address: %p", (void*)start_addr, (void*)end_addr);
+    snprintf(buffer, sizeof(buffer), "Set Global redzone:  Start address: %p, end address: %p, global variable start: %p", (void*)start_addr, (void*)end_addr, ptr);
     uart_debug_print(buffer);
 
 
@@ -324,17 +325,17 @@ void configure_mpu_for_poison(void *ptr, uint32_t size) {
 
     uintptr_t start_addr = (uintptr_t)ptr;
     uintptr_t end_addr = start_addr + size;
-    end_addr = (end_addr) & ~(ALIGNMENT - 1);
+    end_addr = (end_addr+ ALIGNMENT - 1) & ~(ALIGNMENT - 1);
 
     // 디버그
     char buffer[100];
-    snprintf(buffer, sizeof(buffer), "Set MPU-Protected Poison:  Start address: %p, end address: %p", (void*)start_addr, (void*)end_addr);
+    snprintf(buffer, sizeof(buffer), "Set MPU-Protected Poison:  Start address: %p, end address: %p, size: %zu\r\n", (void*)start_addr, (void*)end_addr, (size_t)(end_addr-start_addr));
     uart_debug_print(buffer);
 
 
 
     
-    MPU_ConfigureRegion(MPU_REGION_NUMBER6, MPU_REGION_ENABLE, start_addr, (int)(end_addr-start_addr) , MPU_REGION_PRIV_RW);
+    MPU_ConfigureRegion(MPU_REGION_NUMBER6, MPU_REGION_ENABLE, start_addr, (size_t)(end_addr-start_addr) , MPU_REGION_PRIV_RO);
     HAL_MPU_EnableRegion(MPU_REGION_NUMBER6);
       
     HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
@@ -343,13 +344,14 @@ void configure_mpu_for_poison(void *ptr, uint32_t size) {
 void configure_mpu_for_null_ptr(){
   // MPU 설정
   HAL_MPU_Disable();
-  MPU_ConfigureRegion(MPU_REGION_NUMBER7, MPU_REGION_ENABLE, 0x0, ARM_MPU_REGION_SIZE_32B * 8 , MPU_REGION_PRIV_RO);
+  MPU_ConfigureRegion(MPU_REGION_NUMBER7, MPU_REGION_ENABLE, 0x0, 0x20 , MPU_REGION_PRIV_RO);
   HAL_MPU_EnableRegion(MPU_REGION_NUMBER7);
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 
    // 디버그
     char buffer[100];
     snprintf(buffer, sizeof(buffer), "Set MPU-Protected NullPtr\r\n");
+ 
     uart_debug_print(buffer);
 }
 
