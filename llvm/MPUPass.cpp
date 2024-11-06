@@ -12,16 +12,19 @@ PreservedAnalyses StackMPUPass::run(Function &F,
     Module *M = F.getParent();
     
     BasicBlock &EntryBlock = F.getEntryBlock();
-    IRBuilder<> builder(&EntryBlock.front());
     LLVMContext &context = F.getContext();
+
+    
 
     // configure_mpu_redzone_for_call 함수 선언을 찾거나 생성
     FunctionCallee configureMPURedzoneForCall = M->getOrInsertFunction(
         "configure_mpu_redzone_for_call",
-        Type::getVoidTy(context)  // 반환 타입 (void)
+        FunctionType::get(
+            Type::getVoidTy(context),                    // 반환 타입 (void)
+            {Type::getInt32Ty(context), Type::getInt32Ty(context)},  // 매개변수 타입들 (uint32_t, uint32_t)
+            false                                        // 가변 인자 여부 (false)
+        )
     );
-    // 함수의 시작 부분에 configure_mpu_redzone_for_call 호출을 삽입
-    builder.CreateCall(configureMPURedzoneForCall);
 
     // RSP 조정을 위한 어셈블리 코드 삽입
     // Inline assembly to adjust rsp by 64 bytes (redzone)
@@ -32,6 +35,29 @@ PreservedAnalyses StackMPUPass::run(Function &F,
     InlineAsm *AddRSP = InlineAsm::get(
         FunctionType::get(Type::getVoidTy(context), false),
         "add sp, 72", "", true);
+    
+    // `sp` 값을 불러오는 인라인 ASM
+    InlineAsm *AsmSp = InlineAsm::get(
+        FunctionType::get(Type::getInt32Ty(context), false), 
+        "mov $0, sp",                                     
+        "=r",                                             
+        true                                               
+    );
+
+    // `r7` 값을 불러오는 인라인 ASM
+    InlineAsm *AsmR7 = InlineAsm::get(
+        FunctionType::get(Type::getInt32Ty(context), false),  // 반환 타입: int32
+        "mov $0, r7",                                        // 어셈블리 코드
+        "=r",                                                // 출력 제약 조건
+        true                                                 // 읽기 전용 여부
+    );
+
+    // 함수의 시작 부분에 configure_mpu_redzone_for_call 호출을 삽입
+    IRBuilder<> builder(&EntryBlock.front());
+    Value *SpVal = builder.CreateCall(AsmSp);
+    Value *R7Val = builder.CreateCall(AsmR7);
+    builder.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});
+
 
     for (auto &BB : F) {
         for (auto I = BB.begin(); I != BB.end(); ++I) {
@@ -50,6 +76,13 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                 else {
                     errs() << "  Indirect function call detected in function: " 
                            << F.getName() << "\n";
+
+                     if (isa<InlineAsm>(CI->getCalledOperand())) {
+                        errs() << "  InlineAsm call detected\n";
+                        continue;
+                    } else {
+                        errs() << "  Indirect function call detected\n";
+                    }
                 }  
                 
                 // 함수 호출 전: "sub rsp, 64" 삽입
@@ -62,12 +95,12 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                 if (I != BB.end()) { // Check if iterator is still valid
                     IRBuilder<> BuilderAfter(&*I);
                     BuilderAfter.CreateCall(AddRSP);
-                    BuilderAfter.CreateCall(configureMPURedzoneForCall);
+                    BuilderAfter.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});
                 }
                 else{
                     IRBuilder<> BuilderRedzone(CI->getNextNode());
                     BuilderRedzone.CreateCall(AddRSP);
-                    BuilderRedzone.CreateCall(configureMPURedzoneForCall);
+                    BuilderRedzone.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});
                 }
                 
                 --I; 

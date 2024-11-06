@@ -191,17 +191,13 @@ void MPU_Enable(void) {
      }
 }
 
-void configure_mpu_redzone_for_call() {
-    uint32_t sp, r7;
-    __asm__ volatile("mov %0, sp" : "=r"(sp));  // 현재 SP 가져오기
-    __asm__ volatile("mov %0, r7" : "=r"(r7));  // 현재 SP 가져오기
+void configure_mpu_redzone_for_call(uint32_t sp, uint32_t r7) {
 
-    sp = sp & ~(uintptr_t)(ALIGNMENT - 1);
-    r7 = (r7 + ALIGNMENT - 1) & ~(uintptr_t)(ALIGNMENT - 1);
+    HAL_MPU_Disable();
 
     // Red Zone의 앞뒤 주소 계산
-    uint32_t front_addr = sp; // Redzone 0이 시작되는 주소
-    uint32_t back_addr = r7; // Redzone 1이 시작하는 주소
+    uint32_t front_addr = sp & ~(uintptr_t)(ALIGNMENT - 1); // Redzone 0이 시작되는 주소
+    uint32_t back_addr = (r7 + ALIGNMENT - 1) & ~(uintptr_t)(ALIGNMENT - 1);; // Redzone 1이 시작하는 주소
 
     // 디버그
     char buffer[100];
@@ -210,7 +206,7 @@ void configure_mpu_redzone_for_call() {
     snprintf(buffer, sizeof(buffer), "Stack MPU started: %p, ended: %p", (void *)front_addr, (void *)back_addr);
     uart_debug_print(buffer);
 
-    HAL_MPU_Disable();
+    
 
     // Red Zone 앞부분 설정 (MPU 영역 0)
     MPU_ConfigureRegion(MPU_REGION_NUMBER0, MPU_REGION_ENABLE, front_addr - REDZONE_SIZE/2, REDZONE_SIZE/2, MPU_REGION_PRIV_RO);  // Red Zone 앞쪽 설정  
@@ -222,6 +218,9 @@ void configure_mpu_redzone_for_call() {
 }
 
 void configure_mpu_redzone_for_return() {
+  
+    HAL_MPU_Disable();
+
     uint32_t sp, r7;
     __asm__ volatile("mov %0, sp" : "=r"(sp));  // 현재 SP 가져오기
     __asm__ volatile("mov %0, r7" : "=r"(r7));  // 현재 SP 가져오기
@@ -238,7 +237,6 @@ void configure_mpu_redzone_for_return() {
     snprintf(buffer, sizeof(buffer), "Unset Stack Pointer and R7 values:  SP: %x, R7: %x", sp, r7);
     uart_debug_print(buffer);
 
-    HAL_MPU_Disable();
 
     // Red Zone 앞부분 설정 (MPU 영역 0)
     MPU_ConfigureRegion(MPU_REGION_NUMBER0, MPU_REGION_DISABLE, front_addr - REDZONE_SIZE/2, REDZONE_SIZE/2, MPU_REGION_ALL_RO);  // Red Zone 앞쪽 설정  
@@ -253,6 +251,10 @@ void configure_mpu_redzone_for_return() {
 }
 
 void configure_mpu_redzone_for_heap_access(void* ptr){
+
+      // MPU 설정
+    HAL_MPU_Disable();
+
         if (!ptr) {
         printf("Invalid pointer\n");
         return;
@@ -273,8 +275,7 @@ void configure_mpu_redzone_for_heap_access(void* ptr){
     snprintf(buffer, sizeof(buffer), "Heap MPU started: %p, ended: %p", (void *)start_addr, (void *)end_addr);
     uart_debug_print(buffer);
 
-    // MPU 설정
-    HAL_MPU_Disable();
+
 
     // Red Zone 앞부분 설정 (MPU 영역 2)
     MPU_ConfigureRegion(MPU_REGION_NUMBER2, MPU_REGION_ENABLE, start_addr - (REDZONE_SIZE / 2), REDZONE_SIZE / 2, MPU_REGION_PRIV_RO);  // Red Zone 앞쪽 설정  
@@ -290,6 +291,9 @@ void configure_mpu_redzone_for_heap_access(void* ptr){
 }
 
 void configure_mpu_redzone_for_global(void *ptr, uint64_t size) {
+      // MPU 설정
+    HAL_MPU_Disable();
+
     uintptr_t start_addr = (uintptr_t)ptr;
     uintptr_t end_addr = start_addr + size;
     end_addr = (end_addr + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
@@ -299,8 +303,6 @@ void configure_mpu_redzone_for_global(void *ptr, uint64_t size) {
     snprintf(buffer, sizeof(buffer), "Set Global redzone:  Start address: %p, end address: %p", (void*)start_addr, (void*)end_addr);
     uart_debug_print(buffer);
 
-    // MPU 설정
-    HAL_MPU_Disable();
 
     // Red Zone 앞부분 설정 (MPU 영역 4)
     MPU_ConfigureRegion(MPU_REGION_NUMBER4, MPU_REGION_ENABLE, start_addr - (REDZONE_SIZE / 2), REDZONE_SIZE / 2, MPU_REGION_PRIV_RO);  // Red Zone 앞쪽 설정  
@@ -315,6 +317,9 @@ void configure_mpu_redzone_for_global(void *ptr, uint64_t size) {
 }
 
 void configure_mpu_for_poison(void *ptr, uint32_t size) {
+      // MPU 설정
+    HAL_MPU_Disable();
+    
     uintptr_t start_addr = (uintptr_t)ptr;
     uintptr_t end_addr = start_addr + size;
     end_addr = (end_addr) & ~(ALIGNMENT - 1);
@@ -324,8 +329,7 @@ void configure_mpu_for_poison(void *ptr, uint32_t size) {
     snprintf(buffer, sizeof(buffer), "Set MPU-Protected Poison:  Start address: %p, end address: %p", (void*)start_addr, (void*)end_addr);
     uart_debug_print(buffer);
 
-    // MPU 설정
-    HAL_MPU_Disable();
+
 
     
     MPU_ConfigureRegion(MPU_REGION_NUMBER6, MPU_REGION_ENABLE, start_addr, (int)(end_addr-start_addr) , MPU_REGION_PRIV_RW);
