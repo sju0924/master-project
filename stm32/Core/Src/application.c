@@ -8,13 +8,7 @@ char log_buffer[512];
 int buffer[10];
 
 void application(){
-  test_gv_overflow();
- test_gv_underflow();
-  test_gv_overflow();
-   
-  test_UAF();
-  // test_heap_overflow();
-  // test_heap_underflow();
+  test_uart_print();
   
 }
 
@@ -152,10 +146,17 @@ void test_gv_overflow(){
   }
 }
 
-void test_nullptr_overflow(){
-  int a = 0;
-  int *b = NULL;
-  a = *b; 
+void test_nullptr_derefence(){
+    char * data;
+    data = NULL; /* Initialize data */
+    /* POTENTIAL FLAW: Allocate memory without checking if the memory allocation function failed */
+    strcpy(data, "initialize\r\n\0");
+    data[0] = 'I';
+    uart_send_string_char(data,20);
+    
+    /* FLAW: Initialize memory buffer without checking to see if the memory allocation function failed */
+
+    free(data);
   
 }
 
