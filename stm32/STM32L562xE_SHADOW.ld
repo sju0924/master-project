@@ -129,13 +129,6 @@ SECTIONS
     __bss_end__ = _ebss;
   } >RAM
 
-  /* Shadow memory section */
-  .shadow_memory (NOLOAD) :
-  {
-    . = ORIGIN(RAM_SHADOW);      /* shadow memory 시작 위치 */
-    . += LENGTH(RAM_SHADOW);     /* shadow memory 크기 */
-  } >RAM_SHADOW
-
   /* User_heap_stack section */
   ._user_heap_stack :
   {
@@ -146,6 +139,14 @@ SECTIONS
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
   } >RAM
+
+    /* Shadow memory section */
+  .shadow_memory (NOLOAD) :
+  {
+    . = ORIGIN(RAM_SHADOW);      /* shadow memory 시작 위치 */
+    . += LENGTH(RAM_SHADOW);     /* shadow memory 크기 */
+  } >RAM_SHADOW
+
 
   /* Remove information from the compiler libraries */
   /DISCARD/ :

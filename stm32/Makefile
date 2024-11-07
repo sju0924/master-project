@@ -172,7 +172,7 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 # LDFLAGS
 #######################################
 # link script
-LDSCRIPT = STM32L562xE_FLASH.ld
+LDSCRIPT = STM32L562xE_SHADOW.ld
 
 # libraries
 LIBS = -lc -lm -lnosys 
@@ -257,7 +257,7 @@ $(BUILD_DIR)/%.ll: %.c Makefile | $(BUILD_DIR)
 # 모든 .ll 파일을 링크하여 output.ll 생성
 $(LL_FILE): $(LL_FILES)
 	llvm-link -o drivers.ll $(LL_FILES) 
-	$(LLVM_CC) $(LLVM_FLAGS) $(APPLICATION_FLAGS) -emit-llvm -s -c ${APPLICATION_C_SOURCES} -o ${APPLICATION_LL_FILES}
+	$(LLVM_CC) $(LLVM_FLAGS) $(APPLICATION_FLAGS) -emit-llvm -c ${APPLICATION_C_SOURCES} -o ${APPLICATION_LL_FILES}
 
 $(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR) 
 	$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
