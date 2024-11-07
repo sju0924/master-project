@@ -1,4 +1,6 @@
-#define POISON_TAG 0xFF
+#define UNPOISON_TAG 0xFD
+#define RAM_START 0x20000000
+#define RAM_END 0x2002A000
 #include "runtimeConfig.h"
 
 uint8_t tag_generator();
