@@ -8,8 +8,14 @@ char log_buffer[512];
 int buffer[10];
 
 void application(){
-  test_gv_underflow();
   test_gv_overflow();
+ test_gv_underflow();
+  test_gv_overflow();
+   
+  test_UAF();
+  // test_heap_overflow();
+  // test_heap_underflow();
+  
 }
 
 void test_uart_print(){
@@ -77,10 +83,10 @@ void test_buffer_overflow(){
   
 
   while(1){    
-    *ptr++ = 'A';
+    *(ptr++) = 'A';
     // 기본 오류 정보 작성
     snprintf(log_buffer, sizeof(log_buffer),
-             "Buffer overflow test: Current pc:0x%p\r\n",
+             "Buffer overflow test: Current pc:%p\r\n",
              ptr);
     uart_send_string(log_buffer);
   }
@@ -125,7 +131,7 @@ void test_gv_underflow(){
     buffer[index] = 1;
     // 기본 오류 정보 작성
     snprintf(log_buffer, sizeof(log_buffer),
-             "Global variable test: Current pc:0x%p\r\n",
+             "Global variable underflow test: Current pc:0x%p\r\n",
              buffer + index);
     uart_send_string(log_buffer);
     index--;
@@ -139,9 +145,35 @@ void test_gv_overflow(){
     buffer[index] = 1;
     // 기본 오류 정보 작성
     snprintf(log_buffer, sizeof(log_buffer),
-             "Global variable underflow test: Current pc:0x%p\r\n",
+             "Global variable overflow test: Current pc:0x%p\r\n",
              buffer + index);
     uart_send_string(log_buffer);
     index++;
   }
+}
+
+void test_nullptr_overflow(){
+  int a = 0;
+  int *b = NULL;
+  a = *b; 
+  
+}
+
+void test_UAF(){
+    char log_buffer[100];
+    int *buffer = (int*)malloc(sizeof(int));  // 동적 메모리 할당
+    *buffer = 42;  // 초기화
+
+    snprintf(log_buffer, sizeof(log_buffer),
+             "Allocated memory value: %d at address: 0x%p\r\n", *buffer, (void*)buffer);
+    uart_send_string(log_buffer);
+
+    free(buffer);  // 메모리 해제
+    *buffer = 42;  // 초기화
+    // 해제된 메모리에 접근 (UAF 오류 발생)
+    snprintf(log_buffer, sizeof(log_buffer),
+             "After free: Attempting to access memory at address: 0x%p, value: %d\r\n",
+             (void*)buffer, *buffer);  // *buffer는 UAF 오류를 유발
+    uart_send_string(log_buffer);
+
 }
