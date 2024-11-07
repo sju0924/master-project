@@ -74,16 +74,22 @@ PreservedAnalyses GlobalVariableTagPass::run(Module &M, ModuleAnalysisManager &A
     for (auto &G : M.globals()) {
         if (G.isDeclaration()) continue;
 
-        // 전역 변수 이름과 크기 가져오기
-        uint32_t size = M.getDataLayout().getTypeAllocSize(G.getValueType());
+        // .str 및 .rodata 섹션 제외 -> 사용자 정의 전역 변수일 가능성이 높음
+         if (G.getLinkage() != GlobalValue::InternalLinkage &&
+        G.getLinkage() != GlobalValue::PrivateLinkage){
         
-        // `set_tag` 함수 호출 삽입
-        Value *Addr = Builder.CreateBitCast(&G, PointerType::get(Type::getInt8Ty(context), 0));
-        Value *Size = Builder.getInt32(size);
-        Builder.CreateCall(setTag, {Addr, Size});
+            // 전역 변수 이름과 크기 가져오기
+            uint32_t size = M.getDataLayout().getTypeAllocSize(G.getValueType());
+            
+            // `set_tag` 함수 호출 삽입
+            Value *Addr = Builder.CreateBitCast(&G, PointerType::get(Type::getInt8Ty(context), 0));
+            Value *Size = Builder.getInt32(size);
+            Builder.CreateCall(setTag, {Addr, Size});
 
-        errs() << "Tagged global variable: " << G.getName() << " Addr: " << &G << " Size: " << size << "\n";
-        Modified = true;
+            errs() << "Tagged global variable: " << G.getName() << " Addr: " << &G << " Size: " << size << "\n";
+            Modified = true;
+        }   
+        
         
     }
     Builder.CreateRetVoid();
