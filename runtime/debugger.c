@@ -7,9 +7,16 @@ void MemManage_Handler(void);
 
 // 오류 원인 타입 정의
 typedef enum {
-    ERROR_NONE,
+    ERROR_BUFFER_OVERFLOW,
+    ERROR_BUFFER_UNDERFLOW,
+    ERROR_HEAP_OVERFLOW,
+    ERROR_HEAP_UNDERFLOW,
+    ERROR_GLOBAL_VARIABLE_OVERFLOW,
+    ERROR_GLOBAL_VARIABLE_UNDERFLOW,
+    ERROR_USE_AFTER_FREE,
+    ERROR_NULL_PTR,
     ERROR_TAG_MISMATCH,
-    ERROR_MPU_VIOLATION
+    ERROR_NONE    
 } ErrorType;
 
 // 오류 정보 구조체
@@ -32,9 +39,23 @@ void log_error(ErrorInfo* info) {
     const char* error_cause;
     if (info->type == ERROR_TAG_MISMATCH) {
         error_cause = "Tag Mismatch Detected";
-    } else if (info->type == ERROR_MPU_VIOLATION) {
-        error_cause = "MPU Violation Detected";
-    } else {
+    } else if (info->type == ERROR_BUFFER_OVERFLOW) {
+        error_cause = "Stack Overflow Detected";
+    } else if (info->type == ERROR_BUFFER_UNDERFLOW) {
+        error_cause = "Stack Underflow Detected";
+    }else if (info->type == ERROR_HEAP_OVERFLOW) {
+        error_cause = "Heap Overflow Detected";
+    } else if (info->type == ERROR_HEAP_UNDERFLOW) {
+        error_cause = "Heap Underflow Detected";
+    }else if (info->type == ERROR_GLOBAL_VARIABLE_OVERFLOW) {
+        error_cause = "Global Variable Overflow Detected";
+    }else if (info->type == ERROR_GLOBAL_VARIABLE_UNDERFLOW) {
+        error_cause = "Global Variable Overflow Detected";
+    }else if (info->type == ERROR_USE_AFTER_FREE) {
+        error_cause = "Use After Free Detected";
+    }else if (info->type == ERROR_NULL_PTR) {
+        error_cause = "Null Ptr Use Detected";
+    }else {
         error_cause = "Unknown Error";
     }
 
@@ -48,7 +69,7 @@ void log_error(ErrorInfo* info) {
     if (info->type == ERROR_TAG_MISMATCH) {
         snprintf(log_buffer + strlen(log_buffer), sizeof(log_buffer) - strlen(log_buffer),
                  "Tag mismatch address: %p\r\n", info->tag_mismatch_addr);
-    } else if (info->type == ERROR_MPU_VIOLATION) {
+    } else{
         snprintf(log_buffer + strlen(log_buffer), sizeof(log_buffer) - strlen(log_buffer),
                  "Fault Address (MMFAR): 0x%08X\r\n"
                  "CFSR: 0x%08X\r\n"
@@ -64,9 +85,10 @@ void log_error(ErrorInfo* info) {
 
 // MPU 접근 위반 예외 처리기 (Memory Management Fault Handler)
 void MemManage_Handler(void) {
+    char log_buffer[512];
     ErrorInfo info = {0};
     uint32_t *stack_ptr;
-    info.type = ERROR_MPU_VIOLATION;
+    
 
     // PC와 LR 레지스터 값 읽기
     asm volatile ("mov %0, sp" : "=r" (stack_ptr));  // SP 값 얻기
@@ -78,8 +100,30 @@ void MemManage_Handler(void) {
     info.cfsr = *((volatile uint32_t*)0xE000ED28);   // Configurable Fault Status Register
     info.fault_address = *((volatile uint32_t*)0xE000ED34);  // Memory Management Fault Address Register
 
-    // MPU Region Number Register에서 영역 번호 확인
-    info.mpu_region = (*((volatile uint32_t*)0xE000ED98) & 0xFF);  // 하위 8비트만 사용하여 영역 번호 획득
+    // 2. 접근 위반이 발생한 주소와 설정된 MPU 리전들의 범위를 비교
+    for (uint32_t region = 0; region < 8; region++) {
+        // MPU_RNR 레지스터에 리전 번호 설정
+        *((volatile uint32_t*)0xE000ED98) = region;
+
+        // MPU_RBAR 레지스터에서 리전의 Base Address 읽기
+        uint32_t base_address = *((volatile uint32_t*)0xE000ED9C) & 0xFFFFFFE0;  // 하위 5비트 제외
+
+        // MPU_RLAR 레지스터에서 리전의 Limit address 읽기
+        uint32_t limit_address = *((volatile uint32_t*)0xE000EDA0) & 0xFFFFFFE0;
+
+
+        // fault_address가 해당 리전의 주소 범위에 있는지 확인
+        if (info.fault_address  >= base_address && info.fault_address  <= limit_address) {
+            snprintf(log_buffer + strlen(log_buffer), sizeof(log_buffer) - strlen(log_buffer),
+                 "Region: %d, Base Address: %p, Limit Address: %p, Fault Address: %p\r\n", region, base_address, limit_address, info.fault_address);
+            uart_debug_print(log_buffer);
+            info.type = (ErrorType)region;
+            info.mpu_region = region;
+            break;
+       }
+    }
+
+   
 
     // 로그 작성 및 출력
     log_error(&info);
