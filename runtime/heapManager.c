@@ -1,8 +1,10 @@
 #include "heapManager.h"
 
-char buffer[100];   
 
 void* my_malloc(size_t size) {
+    
+    char buffer[100];
+    uint8_t tag ;
  
     // 필요한 메모리 크기 계산 (요청 크기 + 메타데이터 크기 + 레드존 * 2 + 정렬 여유 공간)
     size_t total_size = size + sizeof(HeapMetadata) + REDZONE_SIZE + (ALIGNMENT - 1);
@@ -23,20 +25,14 @@ void* my_malloc(size_t size) {
 
     // 태그 설정
     // 우선 전체 할당 범위에만 태그 부여
-    uint8_t tag = tag_generator();
-    for (uintptr_t i = aligned_ptr; i < (aligned_ptr + size); i += 8) {
-        set_tag((void*)i, tag);
-    }
-
-    snprintf(buffer, sizeof(buffer), "Tag assigned at: %p, size: %d tag: %d", (void *)aligned_ptr, size, tag);
-    uart_debug_print(buffer);
+    set_tag((void*)aligned_ptr, size);
 
     // 뒤쪽 남는 부분에 패딩 태그 (0x0) 설정
     uintptr_t back_padding_start = aligned_ptr + size;
     uintptr_t end_ptr = raw_ptr + total_size;
-    for (uintptr_t i = back_padding_start; i < end_ptr; i += 8) {
-        set_tag((void*)i, 0x0U);
-    }
+
+    set_tag_padding((void*)back_padding_start,  (size_t)((aligned_ptr + size + ALIGNMENT -1)& ~(ALIGNMENT - 1) - (back_padding_start)));
+    
 
     // 앞뒤 레드존 설정(디버깅용)
     for (size_t i = 0; i < REDZONE_SIZE / 2; i++) {

@@ -226,17 +226,9 @@ PreservedAnalyses GlobalVariableMPUPass::run(Function &F,
     ArrayType *redzoneType = ArrayType::get(int8Ty, GLOBAL_REDZONE_SIZE); // 32바이트 레드존 타입
     const DataLayout &dataLayout = F.getParent()->getDataLayout();
     
-
+    // 전역 변수 교체 및 MPU 보호 함수 호출 삽입
     std::vector<GlobalVariable*> globalsToReplace;
 
-    // 레드존을 추가할 전역 변수 식별
-    for (GlobalVariable &GV : M->globals()) {
-        if (!GV.isConstant() && GV.hasInitializer()) { // 상수가 아닌 초기화된 전역 변수만 처리
-            globalsToReplace.push_back(&GV);
-        }
-    }
-
-    // 전역 변수 교체 및 MPU 보호 함수 호출 삽입
     for (GlobalVariable *GV : globalsToReplace) {
         Type *originalType = GV->getValueType();
         uint64_t globalSize = dataLayout.getTypeAllocSize(originalType); // 전역 변수 크기 계산
@@ -246,14 +238,29 @@ PreservedAnalyses GlobalVariableMPUPass::run(Function &F,
         }
 
         // 전역 변수 + 레드존을 포함하는 새로운 구조체 타입 생성
-        StructType *structWithRedzoneType = StructType::create(
-            {redzoneType, originalType, redzoneType}, // [앞 레드존, 전역 변수, 뒤 레드존]
-            GV->getName().str() + "_with_redzone"
-        );
+        // 필요한 패딩을 계산
+        uint64_t paddingSize = (32 - (globalSize % 32)) % 32;
+
+        // 패딩 크기만큼의 바이트 배열 타입을 정의 (0일 경우 빈 배열이 됩니다)
+        ArrayType *paddingType = ArrayType::get(Type::getInt8Ty(originalType->getContext()), paddingSize);
+
+        // 전역 변수 + 레드존 + 패딩을 포함하는 새로운 구조체 타입 생성
+        StructType *structWithRedzoneType;
+        if (paddingSize > 0) {
+            structWithRedzoneType = StructType::create(
+                {redzoneType, originalType, paddingType, redzoneType}, // [앞 레드존, 전역 변수, 패딩, 뒤 레드존]
+                GV->getName().str() + "_with_redzone"
+            );
+        } else {
+            structWithRedzoneType = StructType::create(
+                {redzoneType, originalType, redzoneType}, // 패딩이 필요 없을 때 [앞 레드존, 전역 변수, 뒤 레드존]
+                GV->getName().str() + "_with_redzone"
+            );
+        }
 
         // 새로운 전역 변수 생성
         GlobalVariable *newGV = new GlobalVariable(
-            *M,
+            M,
             structWithRedzoneType,
             GV->isConstant(),
             GV->getLinkage(),
@@ -263,9 +270,23 @@ PreservedAnalyses GlobalVariableMPUPass::run(Function &F,
 
         // 기존 초기화 값 설정
         Constant *zeroInit = ConstantAggregateZero::get(redzoneType);
-        Constant *initializer = ConstantStruct::get(
-            structWithRedzoneType, {zeroInit, GV->getInitializer(), zeroInit}
-        );
+        Constant *originalInit = GV->hasInitializer() ? GV->getInitializer() : ConstantAggregateZero::get(originalType);
+
+        // 패딩 초기화 값 설정 (필요한 경우)
+        Constant *paddingInit = ConstantAggregateZero::get(paddingType);
+
+        // 초기화 값에 패딩을 포함하여 초기화 생성
+        Constant *initializer;
+        if (paddingSize > 0) {
+            initializer = ConstantStruct::get(
+                structWithRedzoneType, {zeroInit, originalInit, paddingInit, zeroInit}
+            );
+        } else {
+            initializer = ConstantStruct::get(
+                structWithRedzoneType, {zeroInit, originalInit, zeroInit}
+            );
+        }
+
         newGV->setInitializer(initializer);
         newGV->setAlignment(Align(32)); // 32바이트 정렬 설정
 
@@ -278,14 +299,6 @@ PreservedAnalyses GlobalVariableMPUPass::run(Function &F,
 
         GV->eraseFromParent(); // 기존 전역 변수 삭제
     }
-
-    // configure_mpu_redzone_for_global 함수 호출 삽입
-    FunctionCallee configureMPURedzoneForGlobal = M->getOrInsertFunction(
-        "configure_mpu_redzone_for_global",
-        Type::getVoidTy(context),
-        PointerType::get(Type::getInt8Ty(context), 0), // 전역 변수 주소 매개변수 타입 (i8*)
-        Type::getInt64Ty(context)     // 전역 변수 크기 매개변수 타입 (i64)
-    );
 
     ////////////////////////////
     // 전역 변수 접근 변경 탐지 //

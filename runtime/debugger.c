@@ -5,7 +5,7 @@
 void sd_card_write(const char *message);
 
 // 외부에 정의된 compare_tag 함수 선언
-uint8_t compare_tag(void* addr1, void* addr2);
+uint8_t* get_tag_address(void *address);
 
 // 오류 원인 타입 정의
 typedef enum {   
@@ -108,7 +108,8 @@ void handle_tag_mismatch(void* start, void* end) {
     uint8_t* current = (uint8_t*)start;
     uint8_t* last = (uint8_t*)end;
     while (current <= last) {
-        if (compare_tag(start, current) != 0) {
+
+        if (!(*get_tag_address(start) == *get_tag_address(current))) {
             info.tag_mismatch_addr = current;
             break;
         }
