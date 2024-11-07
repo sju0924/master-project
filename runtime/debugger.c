@@ -58,19 +58,19 @@ void log_error(ErrorInfo* info) {
 
     // 기본 오류 정보 작성
     snprintf(log_buffer, sizeof(log_buffer),
-             "Error Cause: %s\n"
-             "PC: 0x%08X, LR: 0x%08X\n",
+             "Error Cause: %s\r\n"
+             "PC: 0x%08X, LR: 0x%08X\r\n",
              error_cause, info->pc, info->lr);
 
     // 추가 정보 작성
     if (info->type == ERROR_TAG_MISMATCH) {
         snprintf(log_buffer + strlen(log_buffer), sizeof(log_buffer) - strlen(log_buffer),
-                 "Tag mismatch address: %p\n", info->tag_mismatch_addr);
+                 "Tag mismatch address: %p\r\n", info->tag_mismatch_addr);
     } else if (info->type == ERROR_MPU_VIOLATION) {
         snprintf(log_buffer + strlen(log_buffer), sizeof(log_buffer) - strlen(log_buffer),
-                 "Fault Address (MMFAR): 0x%08X\n"
-                 "CFSR: 0x%08X\n"
-                 "MPU Region: %u\n", 
+                 "Fault Address (MMFAR): 0x%08X\r\n"
+                 "CFSR: 0x%08X\r\n"
+                 "MPU Region: %u\r\n", 
                  info->fault_address, info->cfsr, info->mpu_region);
     }
 
