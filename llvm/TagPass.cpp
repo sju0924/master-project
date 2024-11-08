@@ -11,6 +11,31 @@ bool isUserDefinedStruct(StructType *structType) {
     return structType->hasName() && structType->getName().startswith("struct.");
 }
 
+void insertSetStructTagsCall(Instruction *inst, StructType *structType,  Value* addr, Module *M, LLVMContext &Context) {
+    // 구조체의 이름을 통해 인덱스를 찾기
+    std::string structName = structType->getName().str();
+    auto indexIt = StructMetadataIndexMap.find(structName);
+    if (indexIt == StructMetadataIndexMap.end()) {
+        errs() << "No metadata index found for struct type: " << structName << "\n";
+        return;
+    }
+    uint32_t structIndex = indexIt->second;
+
+    IRBuilder<> builder(inst->getNextNode());
+
+    // `set_struct_tags` 함수 선언 가져오기 또는 생성
+    FunctionCallee setTagFunc = M->getOrInsertFunction(
+        "set_struct_tags", Type::getVoidTy(Context),
+        Type::getInt8PtrTy(Context),   // 구조체 주소 포인터
+        Type::getInt32Ty(Context)      // 구조체 메타데이터 인덱스
+    );
+
+    // 두 번째 인자로 메타데이터 인덱스 전달
+    Value *indexValue = builder.getInt32(structIndex);
+
+    // `set_struct_tags` 호출 삽입
+    builder.CreateCall(setTagFunc, {addr, indexValue});
+}
 // 태그 설정을 위한 LLVM 패스 정의
 
 // `run` 메서드는 Function 단위로 실행됨
@@ -51,18 +76,7 @@ PreservedAnalyses StackTagPass::run(Function &F, FunctionAnalysisManager &AM) {
 
                 // 구조체일 경우 각 멤버별로 태그 할당
                 if (isUserDefinedStruct(dyn_cast<StructType>(allocaInst->getAllocatedType()))) {                    
-                            // 구조체 타입 이름을 통해 인덱스 확인
-                            std::string structName = structType->getName().str();
-                            auto indexIt = StructMetadataIndexMap.find(structName);
-                            if (indexIt == StructMetadataIndexMap.end()) {
-                                errs() << "No metadata index found for struct type: " << structName << "\n";
-                                return;
-                            }
-                            uint32_t structIndex = indexIt->second;
-
-                            Value *indexValue = builder.getInt32(structIndex);
-                            Builder.CreateCall(setStructTagFunc, {Addr, index});
-                        
+                    insertSetStructTagsCall(&I, structType, Addr, &M, Context);
                 }
                 else{
                     Builder.CreateCall(setTag, {Addr, AllocSize});
@@ -116,7 +130,15 @@ PreservedAnalyses GlobalVariableTagPass::run(Module &M, ModuleAnalysisManager &A
             // `set_tag` 함수 호출 삽입
             Value *Addr = Builder.CreateBitCast(&G, PointerType::get(Type::getInt8Ty(context), 0));
             Value *Size = Builder.getInt32(size);
-            Builder.CreateCall(setTag, {Addr, Size});
+            
+            // 구조체일 경우 각 멤버별로 태그 할당
+            if (isUserDefinedStruct(dyn_cast<StructType>(allocaInst->getAllocatedType()))) {                    
+                insertSetStructTagsCall(&I, structType, Addr, &M, Context);
+            }
+            else{
+                Builder.CreateCall(setTag, {Addr, AllocSize});
+            }
+                
 
             errs() << "Tagged global variable: " << G.getName() << " Addr: " << &G << " Size: " << size << "\n";
             Modified = true;
@@ -217,64 +239,63 @@ PreservedAnalyses StructMetadataPass::run(Module &M, ModuleAnalysisManager &AM) 
     std::vector<Constant *> sizesArray;
     std::vector<Constant *> countsArray;
 
-    size_t numMembers = 0;
+    // 각 구조체별 인덱스 저장
+    std::map<std::string, uint32_t> StructMetadataIndexMap;
+
+    uint32_t numMembers = 0;
     // 모든 구조체 타입에 대해 메타데이터 수집
     for (StructType *structType : M.getIdentifiedStructTypes()) {
         if (!isUserDefinedStruct(structType))
             continue;
 
+        // 고유 인덱스를 할당하여 매핑 테이블에 저장
+        std::string structName = structType->getName().str();
+        StructMetadataIndexMap[structName] = CurrentIndex++;
+
         std::vector<Constant *> offsets, sizes;
-        collectStructMetadata(structType, DL, Context, offsets, sizes);
+        numMembers = collectStructMetadata(structType, DL, Context, offsets, sizes);
 
-        numMembers = offsets.size();
         countsArray.push_back(ConstantInt::get(Type::getInt32Ty(Context), numMembers));
-
-        // 구조체별로 고유한 배열 크기 사용
-        offsetsArray.push_back(ConstantArray::get(ArrayType::get(Type::getInt32Ty(Context), numMembers), offsets));
-        sizesArray.push_back(ConstantArray::get(ArrayType::get(Type::getInt32Ty(Context), numMembers), sizes));
-
-        CurrentIndex++;
+        offsetsArray.push_back(offsets);
+        sizesArray.push_back(sizes);
     }
 
     // 전역 배열로 모듈에 추가
     if(numMembers){
-        ArrayType *offsetsArrayType = ArrayType::get(ArrayType::get(Type::getInt32Ty(Context), numMembers), offsetsArray.size());
-        ArrayType *sizesArrayType = ArrayType::get(ArrayType::get(Type::getInt32Ty(Context), numMembers), sizesArray.size());
+        for (size_t i = 0; i < offsetsArray.size(); ++i) {
+            ArrayType *innerOffsetsArrayType = ArrayType::get(Type::getInt64Ty(Context), offsetsArray[i].size());
+            ArrayType *innerSizesArrayType = ArrayType::get(Type::getInt64Ty(Context), sizesArray[i].size());
 
-        new GlobalVariable(M, offsetsArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(offsetsArray), "struct_member_offsets");
-        new GlobalVariable(M, sizesArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(sizesArray), "struct_member_sizes");
-        new GlobalVariable(M, ArrayType::get(Type::getInt64Ty(Context), countsArray.size()), true, GlobalValue::ExternalLinkage, ConstantArray::get(countsArray), "struct_member_counts")
-    }
+            offsetsGlobalArray.push_back(ConstantArray::get(innerOffsetsArrayType, offsetsArray[i]));
+            sizesGlobalArray.push_back(ConstantArray::get(innerSizesArrayType, sizesArray[i]));
+        }
+
+        new GlobalVariable(M, ArrayType::get(offsetsArrayType, offsetsGlobalArray.size()), true, GlobalValue::ExternalLinkage, ConstantArray::get(offsetsGlobalArray), "struct_member_offsets");
+        new GlobalVariable(M, ArrayType::get(sizesArrayType, sizesGlobalArray.size()), true, GlobalValue::ExternalLinkage, ConstantArray::get(sizesGlobalArray), "struct_member_sizes");
+        new GlobalVariable(M, ArrayType::get(Type::getInt64Ty(Context), countsArray.size()), true, GlobalValue::ExternalLinkage, ConstantArray::get(countsArray), "struct_member_counts");
+
+   }
 
 
     return (Modified ? PreservedAnalyses::none() : PreservedAnalyses::all());
 };
 
 
-void StructMetadataPass::collectStructMetadata(StructType *structType, const DataLayout &DL, LLVMContext &Context,
+uint32_t StructMetadataPass::collectStructMetadata(StructType *structType, const DataLayout &DL, LLVMContext &Context,
                             std::vector<Constant *> &offsetsArray, std::vector<Constant *> &sizesArray) {
-    for (unsigned i = 0; i < structType->getNumElements(); ++i) {
+
+    uint32_t elementNum = structType->getNumElements();
+    for (unsigned i = 0; i < elementNum; ++i) {
         uint64_t memberOffset = DL.getStructLayout(structType)->getElementOffset(i);
         uint64_t memberSize = DL.getTypeAllocSize(structType->getElementType(i));
 
         offsetsArray.push_back(ConstantInt::get(Type::getInt32Ty(Context), memberOffset));
         sizesArray.push_back(ConstantInt::get(Type::getInt32Ty(Context), memberSize));
     }
+
+    return elementNum;
 }
 
-StructType* StructMetadataPass::detectMallocStructType(CallInst *callInst, const DataLayout &DL){
-    if (ConstantInt *sizeArg = dyn_cast<ConstantInt>(callInst->getArgOperand(0))) {
-        uint64_t allocSize = sizeArg->getZExtValue();
-
-        // 모듈 내 정의된 구조체 크기와 비교하여 추정
-        for (StructType *structType : callInst->getModule()->getIdentifiedStructTypes()) {
-            if (DL.getTypeAllocSize(structType) == allocSize) {
-                return structType; // 크기가 일치하는 구조체 타입 반환
-            }
-        }
-    }
-    return nullptr; // 구조체 타입을 찾지 못함
-}
 
 } // namespace
 
