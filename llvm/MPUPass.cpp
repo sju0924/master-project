@@ -158,6 +158,7 @@ PreservedAnalyses HeapMPUPass::run(Function &F,
                             // 힙 오브젝트 포인터와 크기를 저장
                             if (ConstantInt *size = dyn_cast<ConstantInt>(CI->getArgOperand(0))) {
                                 uint64_t allocSize = size->getZExtValue();
+                                errs() << "Heap object Allocation Detected: "<< CI<<"\n";
                                 ///unsigned typeSize = dataLayout.getTypeAllocSize(CI->getType());
                                 heapObjects[CI] = allocSize; // * typeSize;  // 시작 주소와 크기 저장
                                 
@@ -374,16 +375,15 @@ PreservedAnalyses GlobalVariableMPUPass::run(Module &M, ModuleAnalysisManager &A
     Value *runtimeBodyPtr =nullptr;
     Value *runtimeBodySize = nullptr;
     for (auto &F : M.functions()) {
-        for (auto &BB : F) {
-                lastGlobalVariable = nullptr;
+        lastGlobalVariable = nullptr;
+        for (auto &BB : F) {                
                 for (auto &I : BB) {
                     // load 명령어에서 전역 변수 접근 탐지
                     if (auto *LI = dyn_cast<LoadInst>(&I)) {
                         if(GlobalVariable* GV = CheckGlobalVariableAccessChanged(LI->getPointerOperand(), &I)){
 
                             // 크기: 레드존을 포함한 전체 구조체의 크기 계산
-                            uint64_t structSize = dataLayout.getTypeAllocSize(GV->getValueType());
-                            errs()<<"ValueType: "<<GV->getValueType()<<" GV: "<<GV->getName()<<"\n";
+                            uint64_t structSize = dataLayout.getTypeAllocSize(GV->getValueType());;
 
                             // 전역 변수 본체의 포인터 추적
                             if (auto *structType = dyn_cast<StructType>(GV->getValueType())) {
@@ -414,7 +414,7 @@ PreservedAnalyses GlobalVariableMPUPass::run(Module &M, ModuleAnalysisManager &A
                                 runtimeBodyPtr = builder.CreateBitCast(globalBodyPtr, PointerType::get(Type::getInt8Ty(GV->getContext()), 0));
                                 runtimeBodySize = ConstantInt::get(Type::getInt64Ty(GV->getContext()), globalBodySize);
                                 builder.CreateCall(configureMPURedzoneForGlobal, {runtimeBodyPtr, runtimeBodySize});
-                                errs() << "Set global variable MPU: " << GV->getName() << "\n";
+                               // errs() << "Set global variable MPU: " << GV->getName() << "\n";
 
                                 
                             }
@@ -429,7 +429,7 @@ PreservedAnalyses GlobalVariableMPUPass::run(Module &M, ModuleAnalysisManager &A
 
                             // 크기: 레드존을 포함한 전체 구조체의 크기 계산
                             uint64_t structSize = dataLayout.getTypeAllocSize(GV->getValueType());
-                            errs()<<"ValueType: "<<GV->getValueType()<<" GV: "<<GV->getName()<<"\n";
+                           // errs()<<"ValueType: "<<GV->getValueType()<<" GV: "<<GV->getName()<<"\n";
 
                             // 전역 변수 본체의 포인터 추적
                             if (auto *structType = dyn_cast<StructType>(GV->getValueType())) {
@@ -460,7 +460,7 @@ PreservedAnalyses GlobalVariableMPUPass::run(Module &M, ModuleAnalysisManager &A
                                 runtimeBodyPtr = builder.CreateBitCast(globalBodyPtr, PointerType::get(Type::getInt8Ty(GV->getContext()), 0));
                                 runtimeBodySize = ConstantInt::get(Type::getInt64Ty(GV->getContext()), globalBodySize);
                                 builder.CreateCall(configureMPURedzoneForGlobal, {runtimeBodyPtr, runtimeBodySize});
-                                errs() << "Set global variable MPU: " << GV->getName() << "\n";
+                              //  errs() << "Set global variable MPU: " << GV->getName() << "\n";
 
                                 
                             }
@@ -520,7 +520,7 @@ GlobalVariable* GlobalVariableMPUPass::CheckGlobalVariableAccessChanged(Value *c
             if (lastGlobalVariable && globalVars.find(lastGlobalVariable) == globalVars.end()) {
                 lastGlobalVariable = nullptr;
             }
-            errs()<<"last GV: "<<lastGlobalVariable<<", cur GV: "<<currentGlobalVariable<<"\n";
+           // errs()<<"last GV: "<<lastGlobalVariable<<", cur GV: "<<currentGlobalVariable<<"\n";
             if (lastGlobalVariable != currentGlobalVariable) {
                 errs() << "Accessing a different global variable at: " << *I << "\n";
                 lastGlobalVariable = currentGlobalVariable;
