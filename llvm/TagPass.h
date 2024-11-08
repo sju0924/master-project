@@ -17,6 +17,8 @@ using namespace llvm;
 
 namespace {
 
+bool isUserDefinedStruct(StructType *structType);
+
 struct StackTagPass : public PassInfoMixin<StackTagPass> {
 public:
     PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
@@ -40,6 +42,23 @@ public:
     static StringRef name() { return "PointerArithmeticPass"; }
 
 private:
+ 
+}; 
+
+struct StructMetadataPass : public PassInfoMixin<GlobalVariableTagPass> {
+public: 
+
+    PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
+    static StringRef name() { return "StructMetadataPass"; }
+
+private:
+
+     // 각 멤버의 오프셋과 크기 정보를 수집하여 전역 변수에 저장
+    void collectStructMetadata(StructType *structType, const DataLayout &DL, LLVMContext &Context,
+                               std::vector<Constant *> &offsetsArray, std::vector<Constant *> &sizesArray);
+
+    // malloc 호출에서 크기를 기준으로 구조체 타입인지 추정
+    StructType* detectMallocStructType(CallInst *callInst, const DataLayout &DL);
  
 }; 
 
