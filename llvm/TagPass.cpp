@@ -18,7 +18,9 @@ StructType* isUserDefinedStruct(StructType *structType) {
     return nullptr;
 }
 
-void insertSetStructTagsCall(IRBuilder<> &builder, StructType *structType,  Value* addr, Module *M, LLVMContext &Context) {
+void insertSetStructTagsCall(StructType *structType, Instruction& I, Module *M, LLVMContext &Context) {
+
+  
     // 구조체의 이름을 통해 인덱스를 찾기
     std::string structName = structType->getName().str();
     auto indexIt = StructMetadataIndexMap.find(structName);
@@ -36,6 +38,9 @@ void insertSetStructTagsCall(IRBuilder<> &builder, StructType *structType,  Valu
     );
 
     // 두 번째 인자로 메타데이터 인덱스 전달
+    IRBuilder<> builder(&I); 
+    builder.SetInsertPoint(I.getNextNode());
+    Value *addr = builder.CreateBitCast(&I, PointerType::get(Type::getInt8Ty(I.getContext()), 0));
     Value *indexValue = builder.getInt32(structIndex);
 
     // `set_struct_tags` 호출 삽입
@@ -62,32 +67,37 @@ PreservedAnalyses StackTagPass::run(Function &F, FunctionAnalysisManager &AM) {
         Type::getInt32Ty(context)     // 힙 오브젝트 크기 매개변수 타입 (i32)
     );
 
-    // `set_struct_tags` 함수의 선언 가져오기 또는 삽입
-    FunctionCallee setStructTagFunc = M->getOrInsertFunction(
-        "set_struct_tags", Type::getVoidTy(context),
-        PointerType::get(Type::getInt8Ty(context),0),   // 구조체 주소 (void*)
-        Type::getInt32Ty(context)      // 구조체 메타데이터 인덱스 (uint32_t)
-    );
+     // 구조체 인덱스 불러오기
+    if (auto *MD = F.getParent()->getNamedMetadata("struct.metadata")) {
+        for (auto *Operand : MD->operands()) {
+            std::string StructName = dyn_cast<MDString>(Operand->getOperand(0))->getString().str();
+            uint32_t Index = mdconst::extract<ConstantInt>(Operand->getOperand(1))->getZExtValue();
+
+            StructMetadataIndexMap[StructName] = Index;
+            errs()<<"Retrive Metadata index map: "<<StructName<<", index: "<<Index<<"\n";
+        }
+    }
 
     // 함수의 모든 기본 블록을 순회
     for (auto &BB : F) {
         for (auto &I : BB) {
-            if (AllocaInst *allocInst = dyn_cast<AllocaInst>(&I)) {         
-                // 태그 설정 함수 호출을 IR에 삽입
-                IRBuilder<> Builder(&I); 
-                Value *Addr = Builder.CreateBitCast(allocInst, PointerType::get(Type::getInt8Ty(allocInst->getContext()), 0));
-                Value *AllocSize = ConstantInt::get(Type::getInt64Ty(allocInst->getContext()), ((allocInst->getAllocationSizeInBits(F.getParent()->getDataLayout()))->getFixedValue()) / 8);
+            if (AllocaInst *allocInst = dyn_cast<AllocaInst>(&I)) {                       
 
 
                 // 구조체일 경우 각 멤버별로 태그 할당
                 if (StructType* structType = isUserDefinedStruct(dyn_cast<StructType>(allocInst->getAllocatedType()))) {                    
-                    insertSetStructTagsCall(Builder, structType, Addr, M, context);
+                    insertSetStructTagsCall(structType, I, M, context);
                 }
                 else{
+                    // 태그 설정 함수 호출을 IR에 삽입
+                    IRBuilder<> Builder(&I); 
+                    Builder.SetInsertPoint(I.getNextNode());
+                    Value *Addr = Builder.CreateBitCast(allocInst, PointerType::get(Type::getInt8Ty(allocInst->getContext()), 0));
+                    Value *AllocSize = ConstantInt::get(Type::getInt32Ty(allocInst->getContext()), ((allocInst->getAllocationSizeInBits(F.getParent()->getDataLayout()))->getFixedValue()) / 8);
                     Builder.CreateCall(setTag, {Addr, AllocSize});
                 }
                     
-                errs() << "Detect function local variable: "<<allocInst->getName()<<" size: "<<AllocSize<<"\n";
+                errs() << "Detect function local variable: "<<allocInst->getName()<<" size: "<<ConstantInt::get(Type::getInt64Ty(allocInst->getContext()), ((allocInst->getAllocationSizeInBits(F.getParent()->getDataLayout()))->getFixedValue()) / 8)<<"\n";
                 Modified = true;
             }
         }
@@ -109,7 +119,6 @@ PreservedAnalyses GlobalVariableTagPass::run(Module &M, ModuleAnalysisManager &A
         PointerType::get(Type::getInt8Ty(M.getContext()), 0), // 주소 (i8*)
         Type::getInt32Ty(M.getContext())                      // 크기 (i32)
     );
-
      // 초기화 함수 생성
     Function *initFunc = Function::Create(
         FunctionType::get(Type::getVoidTy(context), false),
@@ -117,6 +126,17 @@ PreservedAnalyses GlobalVariableTagPass::run(Module &M, ModuleAnalysisManager &A
         "__global_var_init",
         M
     );
+
+    // 구조체 인덱스 불러오기
+    if (auto *MD = M.getNamedMetadata("struct.metadata")) {
+        for (auto *Operand : MD->operands()) {
+            std::string StructName = dyn_cast<MDString>(Operand->getOperand(0))->getString().str();
+            uint32_t Index = mdconst::extract<ConstantInt>(Operand->getOperand(1))->getZExtValue();
+
+            StructMetadataIndexMap[StructName] = Index;
+        }
+    }
+    
     BasicBlock *entry = BasicBlock::Create(context, "entry", initFunc);
     IRBuilder<> Builder(entry);
 
@@ -132,15 +152,15 @@ PreservedAnalyses GlobalVariableTagPass::run(Module &M, ModuleAnalysisManager &A
             // 전역 변수 이름과 크기 가져오기
             uint32_t size = M.getDataLayout().getTypeAllocSize(G.getValueType());
             
-            // `set_tag` 함수 호출 삽입
-            Value *Addr = Builder.CreateBitCast(&G, PointerType::get(Type::getInt8Ty(context), 0));
-            Value *Size = Builder.getInt32(size);
-            
+       
             // 구조체일 경우 각 멤버별로 태그 할당
-            if (StructType* structType = isUserDefinedStruct(dyn_cast<StructType>( G.getValueType()))) {                    
-                insertSetStructTagsCall(Builder, structType, Addr, &M, context);
+            if (StructType* structType = isUserDefinedStruct(dyn_cast<StructType>(G.getValueType()))) {                    
+                insertSetStructTagsCall(structType, entry->front(), &M, context);
             }
             else{
+                // `set_tag` 함수 호출 삽입
+                Value *Addr = Builder.CreateBitCast(&G, PointerType::get(Type::getInt8Ty(context), 0));
+                Value *Size = Builder.getInt32(size);
                 Builder.CreateCall(setTag, {Addr, Size});
             }
                 
@@ -259,6 +279,16 @@ PreservedAnalyses StructMetadataPass::run(Module &M, ModuleAnalysisManager &AM) 
         std::vector<Constant *> offsets, sizes;
         numMembers = collectStructMetadata(structType, DL, Context, offsets, sizes);
 
+        errs()<<structName<<" has "<<numMembers<<" of elements, size : ";
+        for (auto i: sizes){
+            errs()<<*i<<" ";
+        }
+        errs()<<" offsets: ";
+        for (auto i: offsets){
+            errs()<<*i<<" ";
+        }
+        errs()<<"\n";
+
         countsArray.push_back(ConstantInt::get(Type::getInt32Ty(Context), numMembers));
         offsetsArray.push_back(offsets);
         sizesArray.push_back(sizes);
@@ -297,6 +327,16 @@ PreservedAnalyses StructMetadataPass::run(Module &M, ModuleAnalysisManager &AM) 
         ArrayType *emptyCountArrayType = ArrayType::get(Type::getInt32Ty(Context), 0);
         new GlobalVariable(M, emptyCountArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(emptyCountArrayType, {}), "struct_member_counts");
     }
+
+       // StructMetadataIndexMap을 Module에 메타데이터로 저장
+        for (const auto &entry : StructMetadataIndexMap) {
+            M.getOrInsertNamedMetadata("struct.metadata")->addOperand(
+                MDNode::get(M.getContext(), {
+                    MDString::get(M.getContext(), entry.first),
+                    ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(M.getContext()), entry.second))
+                })
+            );
+        }
 
     return (Modified ? PreservedAnalyses::none() : PreservedAnalyses::all());
 }

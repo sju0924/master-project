@@ -22,7 +22,7 @@ namespace {
 std::map<std::string, uint32_t> StructMetadataIndexMap;
 
 StructType* isUserDefinedStruct(StructType *structType);
-void insertSetStructTagsCall(IRBuilder<> &builder, StructType *structType,  Value* addr, Module *M, LLVMContext &Context);
+void insertSetStructTagsCall(StructType *structType,   Instruction& I, Module *M, LLVMContext &Context);
 
 struct StackTagPass : public PassInfoMixin<StackTagPass> {
 public:

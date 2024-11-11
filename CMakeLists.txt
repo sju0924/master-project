@@ -50,7 +50,8 @@ add_custom_target(firmware ALL
 add_custom_target(
     apply_pass
     DEPENDS firmware
-    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTestPass.so -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTagPass.so -passes="my-test-pass,stack-tag-pass,arithmetic-pointer-tag-pass" -S -o ${CMAKE_BINARY_DIR}/application_stack_tag_output.ll ${CMAKE_BINARY_DIR}/../stm32/build/application.ll
+    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTagPass.so -passes="struct-metadata-pass" -S -o ${CMAKE_BINARY_DIR}/application_tagged.ll ${CMAKE_BINARY_DIR}/../stm32/build/application.ll
+    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTestPass.so -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTagPass.so -passes="my-test-pass,stack-tag-pass,arithmetic-pointer-tag-pass" -S -o ${CMAKE_BINARY_DIR}/application_stack_tag_output.ll  ${CMAKE_BINARY_DIR}/application_tagged.ll
     COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTagPass.so -passes="global-variable-tag-pass,struct-metadata-pass" -S -o ${CMAKE_BINARY_DIR}/application_output.ll ${CMAKE_BINARY_DIR}/application_stack_tag_output.ll
     COMMAND llvm-link -o output.ll ${CMAKE_BINARY_DIR}/../stm32/drivers.ll ${CMAKE_BINARY_DIR}/application_output.ll
 )
