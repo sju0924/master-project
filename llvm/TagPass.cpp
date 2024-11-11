@@ -7,11 +7,18 @@ using namespace llvm;
 namespace {
 
     
-bool isUserDefinedStruct(StructType *structType) {
-    return structType->hasName() && structType->getName().startswith("struct.");
+StructType* isUserDefinedStruct(StructType *structType) {
+    if (!structType || ! structType->hasName()){
+        return nullptr;
+    }
+    else if (structType->getName().starts_with("struct.")){
+        return structType;
+    }       
+    
+    return nullptr;
 }
 
-void insertSetStructTagsCall(Instruction *inst, StructType *structType,  Value* addr, Module *M, LLVMContext &Context) {
+void insertSetStructTagsCall(IRBuilder<> &builder, StructType *structType,  Value* addr, Module *M, LLVMContext &Context) {
     // 구조체의 이름을 통해 인덱스를 찾기
     std::string structName = structType->getName().str();
     auto indexIt = StructMetadataIndexMap.find(structName);
@@ -21,12 +28,10 @@ void insertSetStructTagsCall(Instruction *inst, StructType *structType,  Value* 
     }
     uint32_t structIndex = indexIt->second;
 
-    IRBuilder<> builder(inst->getNextNode());
-
     // `set_struct_tags` 함수 선언 가져오기 또는 생성
     FunctionCallee setTagFunc = M->getOrInsertFunction(
         "set_struct_tags", Type::getVoidTy(Context),
-        Type::getInt8PtrTy(Context),   // 구조체 주소 포인터
+        PointerType::get(Type::getInt8Ty(Context),0),   // 구조체 주소 포인터
         Type::getInt32Ty(Context)      // 구조체 메타데이터 인덱스
     );
 
@@ -59,9 +64,9 @@ PreservedAnalyses StackTagPass::run(Function &F, FunctionAnalysisManager &AM) {
 
     // `set_struct_tags` 함수의 선언 가져오기 또는 삽입
     FunctionCallee setStructTagFunc = M->getOrInsertFunction(
-        "set_struct_tags", Type::getVoidTy(Context),
-        Type::getInt8PtrTy(Context),   // 구조체 주소 (void*)
-        Type::getInt32Ty(Context)      // 구조체 메타데이터 인덱스 (uint32_t)
+        "set_struct_tags", Type::getVoidTy(context),
+        PointerType::get(Type::getInt8Ty(context),0),   // 구조체 주소 (void*)
+        Type::getInt32Ty(context)      // 구조체 메타데이터 인덱스 (uint32_t)
     );
 
     // 함수의 모든 기본 블록을 순회
@@ -75,8 +80,8 @@ PreservedAnalyses StackTagPass::run(Function &F, FunctionAnalysisManager &AM) {
 
 
                 // 구조체일 경우 각 멤버별로 태그 할당
-                if (isUserDefinedStruct(dyn_cast<StructType>(allocaInst->getAllocatedType()))) {                    
-                    insertSetStructTagsCall(&I, structType, Addr, &M, Context);
+                if (StructType* structType = isUserDefinedStruct(dyn_cast<StructType>(allocInst->getAllocatedType()))) {                    
+                    insertSetStructTagsCall(Builder, structType, Addr, M, context);
                 }
                 else{
                     Builder.CreateCall(setTag, {Addr, AllocSize});
@@ -132,11 +137,11 @@ PreservedAnalyses GlobalVariableTagPass::run(Module &M, ModuleAnalysisManager &A
             Value *Size = Builder.getInt32(size);
             
             // 구조체일 경우 각 멤버별로 태그 할당
-            if (isUserDefinedStruct(dyn_cast<StructType>(allocaInst->getAllocatedType()))) {                    
-                insertSetStructTagsCall(&I, structType, Addr, &M, Context);
+            if (StructType* structType = isUserDefinedStruct(dyn_cast<StructType>( G.getValueType()))) {                    
+                insertSetStructTagsCall(Builder, structType, Addr, &M, context);
             }
             else{
-                Builder.CreateCall(setTag, {Addr, AllocSize});
+                Builder.CreateCall(setTag, {Addr, Size});
             }
                 
 
@@ -235,14 +240,13 @@ PreservedAnalyses StructMetadataPass::run(Module &M, ModuleAnalysisManager &AM) 
     bool Modified = false;
 
     // 전역 배열로 저장할 메타데이터들
-    std::vector<Constant *> offsetsArray;
-    std::vector<Constant *> sizesArray;
+    std::vector<std::vector<Constant *>> offsetsArray;
+    std::vector<std::vector<Constant *>> sizesArray;
     std::vector<Constant *> countsArray;
-
-    // 각 구조체별 인덱스 저장
-    std::map<std::string, uint32_t> StructMetadataIndexMap;
+    
 
     uint32_t numMembers = 0;
+    uint32_t CurrentIndex = 0;
     // 모든 구조체 타입에 대해 메타데이터 수집
     for (StructType *structType : M.getIdentifiedStructTypes()) {
         if (!isUserDefinedStruct(structType))
@@ -258,27 +262,44 @@ PreservedAnalyses StructMetadataPass::run(Module &M, ModuleAnalysisManager &AM) 
         countsArray.push_back(ConstantInt::get(Type::getInt32Ty(Context), numMembers));
         offsetsArray.push_back(offsets);
         sizesArray.push_back(sizes);
-    }
 
+        
+    }
+     
+        
     // 전역 배열로 모듈에 추가
     if(numMembers){
+        std::vector<Constant *> offsetsGlobalArray;
+        std::vector<Constant *> sizesGlobalArray;
+
         for (size_t i = 0; i < offsetsArray.size(); ++i) {
-            ArrayType *innerOffsetsArrayType = ArrayType::get(Type::getInt64Ty(Context), offsetsArray[i].size());
-            ArrayType *innerSizesArrayType = ArrayType::get(Type::getInt64Ty(Context), sizesArray[i].size());
+            ArrayType *innerOffsetsArrayType = ArrayType::get(Type::getInt32Ty(Context), offsetsArray[i].size());
+            ArrayType *innerSizesArrayType = ArrayType::get(Type::getInt32Ty(Context), sizesArray[i].size());
 
             offsetsGlobalArray.push_back(ConstantArray::get(innerOffsetsArrayType, offsetsArray[i]));
             sizesGlobalArray.push_back(ConstantArray::get(innerSizesArrayType, sizesArray[i]));
         }
 
-        new GlobalVariable(M, ArrayType::get(offsetsArrayType, offsetsGlobalArray.size()), true, GlobalValue::ExternalLinkage, ConstantArray::get(offsetsGlobalArray), "struct_member_offsets");
-        new GlobalVariable(M, ArrayType::get(sizesArrayType, sizesGlobalArray.size()), true, GlobalValue::ExternalLinkage, ConstantArray::get(sizesGlobalArray), "struct_member_sizes");
-        new GlobalVariable(M, ArrayType::get(Type::getInt64Ty(Context), countsArray.size()), true, GlobalValue::ExternalLinkage, ConstantArray::get(countsArray), "struct_member_counts");
+        ArrayType *outerOffsetsArrayType = ArrayType::get(offsetsGlobalArray[0]->getType(), offsetsGlobalArray.size());
+        ArrayType *outerSizesArrayType = ArrayType::get(sizesGlobalArray[0]->getType(), sizesGlobalArray.size());
+
+        new GlobalVariable(M, outerOffsetsArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(outerOffsetsArrayType, offsetsGlobalArray), "struct_member_offsets");
+        new GlobalVariable(M, outerSizesArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(outerSizesArrayType, sizesGlobalArray), "struct_member_sizes");
+        new GlobalVariable(M, ArrayType::get(Type::getInt32Ty(Context), countsArray.size()), true, GlobalValue::ExternalLinkage, ConstantArray::get(ArrayType::get(Type::getInt32Ty(Context), countsArray.size()), countsArray), "struct_member_counts");
 
    }
+   else{
+   
+        ArrayType *emptyArrayType = ArrayType::get(PointerType::get(Type::getInt8Ty(M.getContext()), 0), 0);
+        new GlobalVariable(M, emptyArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(emptyArrayType, {}), "struct_member_offsets");
+        new GlobalVariable(M, emptyArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(emptyArrayType, {}), "struct_member_sizes");
 
+        ArrayType *emptyCountArrayType = ArrayType::get(Type::getInt32Ty(Context), 0);
+        new GlobalVariable(M, emptyCountArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(emptyCountArrayType, {}), "struct_member_counts");
+    }
 
     return (Modified ? PreservedAnalyses::none() : PreservedAnalyses::all());
-};
+}
 
 
 uint32_t StructMetadataPass::collectStructMetadata(StructType *structType, const DataLayout &DL, LLVMContext &Context,
@@ -322,6 +343,10 @@ extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginIn
                        ArrayRef<PassBuilder::PipelineElement>) {
                         if (Name == "global-variable-tag-pass") {
                             MPM.addPass(GlobalVariableTagPass());
+                            return true;
+                        }
+                        else if (Name == "struct-metadata-pass") {
+                            MPM.addPass(StructMetadataPass());
                             return true;
                         }
                         return false;

@@ -17,8 +17,12 @@ using namespace llvm;
 
 namespace {
 
-bool isUserDefinedStruct(StructType *structType);
-void insertSetStructTagsCall(Instruction *inst, StructType *structType,  Value* addr, Module *M, LLVMContext &Context);
+
+// 각 구조체별 인덱스 저장
+std::map<std::string, uint32_t> StructMetadataIndexMap;
+
+StructType* isUserDefinedStruct(StructType *structType);
+void insertSetStructTagsCall(IRBuilder<> &builder, StructType *structType,  Value* addr, Module *M, LLVMContext &Context);
 
 struct StackTagPass : public PassInfoMixin<StackTagPass> {
 public:
@@ -59,6 +63,7 @@ private:
      // @output: 해당 struct의 element 갯수
     uint32_t collectStructMetadata(StructType *structType, const DataLayout &DL, LLVMContext &Context,
                                std::vector<Constant *> &offsetsArray, std::vector<Constant *> &sizesArray);
+
 
 
  
