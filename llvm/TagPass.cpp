@@ -346,12 +346,21 @@ uint32_t StructMetadataPass::collectStructMetadata(StructType *structType, const
                             std::vector<Constant *> &offsetsArray, std::vector<Constant *> &sizesArray) {
 
     uint32_t elementNum = structType->getNumElements();
-    for (unsigned i = 0; i < elementNum; ++i) {
-        uint64_t memberOffset = DL.getStructLayout(structType)->getElementOffset(i);
-        uint64_t memberSize = DL.getTypeAllocSize(structType->getElementType(i));
+    const StructLayout *layout = DL.getStructLayout(structType);
+    uint64_t alignedOffset = 0;
 
-        offsetsArray.push_back(ConstantInt::get(Type::getInt32Ty(Context), memberOffset));
+    for (unsigned i = 0; i < elementNum; ++i) {
+        uint32_t rawOffset = layout->getElementOffset(i);
+        uint32_t memberSize = DL.getTypeAllocSize(structType->getElementType(i));
+
+        // Get alignment requirement for the current element
+        uint64_t memberAlignment = DL.getPrefTypeAlign(structType->getElementType(i)).value();
+        alignedOffset = alignTo(alignedOffset, memberAlignment);
+
+        offsetsArray.push_back(ConstantInt::get(Type::getInt32Ty(Context), alignedOffset));
         sizesArray.push_back(ConstantInt::get(Type::getInt32Ty(Context), memberSize));
+
+        alignedOffset += memberSize;
     }
 
     return elementNum;

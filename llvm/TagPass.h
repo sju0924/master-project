@@ -10,6 +10,7 @@
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h" 
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Support/Alignment.h"
 #include <set>
 
 

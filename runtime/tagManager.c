@@ -6,7 +6,6 @@ uint8_t prev_tag = 0;
 void uart_debug_print(const char *str);
 
 uint8_t tag_generator(){
-    srand(time(NULL));
     uint8_t tag = 0x00;
     while(tag == prev_tag || tag == 0x00 || tag == UNPOISON_TAG || tag == POISON_TAG){
         tag = rand() % 0xFF;
@@ -65,12 +64,17 @@ void set_tag_padding(void *address, size_t size) {
 }
 
 // 8바이트 경계마다 태그를 다르게 설정하는 함수
-void set_struct_tags(void *struct_address, uint32_t index) {
+void set_struct_tags(void *struct_address, uint32_t item_index) {
     char buffer[100];
+    uint32_t index = 0;
+    // 인덱스 불러오기
+    for(int i = 0 ; i<item_index ; i++){
+        index += struct_member_counts[i];
+    }
 
     // 구조체 메타데이터 불러오기
-    const uint32_t *member_offsets = struct_member_offsets[index];
-    const uint32_t *member_sizes = struct_member_sizes[index];
+    uint32_t* member_offsets = (uint32_t*)(struct_member_offsets + index);
+    uint32_t* member_sizes = (uint32_t*)(struct_member_sizes + index);
     uint32_t num_members = struct_member_counts[index];
 
     // 분석에 필요한 멤버 변수 설정
@@ -81,31 +85,46 @@ void set_struct_tags(void *struct_address, uint32_t index) {
     uint8_t current_tag = 0;
     uint8_t *tag_address;
 
-    for (size_t i = 0; i < num_members; i++) {
+    
+    if(num_members){//debug
+        snprintf(buffer, sizeof(buffer), "Tag metadata size: %zu, base address: %p\n", num_members, base_address + member_offsets[0]);
+        uart_debug_print(buffer);   
+        snprintf(buffer, sizeof(buffer), "Address of tables: offset: %p, size: %p\n", member_offsets, member_sizes);
+        uart_debug_print(buffer);  
+        snprintf(buffer, sizeof(buffer), "Second element of member_offsets: %zu, size: %zu\n", member_offsets[1], member_sizes[1]);
+        uart_debug_print(buffer);  
+    }
+     
+    for (uint32_t i = 0; i < num_members; i++) {
         uintptr_t member_address = base_address + member_offsets[i];
-        size_t member_size = member_sizes[i];
+        uint32_t member_size = (uint32_t)member_sizes[i];
+
+        snprintf(buffer, sizeof(buffer), "Member address: %d, member size: %zu\n", member_address, member_size);
+        uart_debug_print(buffer);
 
         if (member_address < RAM_START || member_address>= RAM_END) {
             continue; // 유효하지 않은 태그 주소는 무시
         }
 
         // 만약 객체의 끝 부분이 8바이트로 나누어 떨어질 시 태그 부여
-        if((member_address + member_size) % 8 == 0 ){
+        if(member_offsets[i] % 8 == 0 ){
             current_address = last_tagged_address;
             current_tag = tag_generator();
 
             // 이전 객체에 대한 태그 설정
-            while(current_address < member_address + member_size){
+            while(current_address <= member_address){
                 tag_address = get_tag_address((void*)current_address);
                 *tag_address = current_tag;
                 current_address += 8;
             }
 
             last_tagged_address = current_address;
+
+            // 디버그 출력 (각 멤버별 태그 정보)
+            snprintf(buffer, sizeof(buffer), "Tag assigned: %u\n",  current_tag);
+            uart_debug_print(buffer);
         }
-        // 디버그 출력 (각 멤버별 태그 정보)
-        snprintf(buffer, sizeof(buffer), "Tag assigned at: %p, size: %zu, tag: %u", (void*)member_address, member_size, current_tag);
-        uart_debug_print(buffer);
+
     }
 }
 
