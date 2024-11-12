@@ -1,8 +1,12 @@
 #include "main.h"
+#include "application.h"
 #include <string.h>
 
 int num1 = 10;
 
+void application(){
+  test_heap_allocation();
+}
 void test_uart_print(){
     const char* msg1 = "Going on...";
     const char* msg2 = "Going off...";
@@ -37,6 +41,7 @@ void test_heap_allocation(){
 
   allocation_test1[3]='Z';
   allocation_test2[4]='Z';
+  allocation_test1[40]='z';
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);        
   uart_send_string_char(allocation_test1, 10);
   uart_send_string_char(allocation_test2, 10);
