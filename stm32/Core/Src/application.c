@@ -3,6 +3,26 @@
 #include <string.h>
 
 int num1 = 10;
+struct test_struct{
+  int a;
+  char b[6];
+  long long int c;
+};
+
+void test_struct_tagging(){
+  char not_struct[11]={'N','O','T',' ','S','T','R','U','C','T','\n'};
+ 
+  struct test_struct ts={
+    1
+    ,{'A','B','C','D','E','F'}
+    , 2
+  };
+
+  ts.b[3] = 'Z';
+  
+ uart_send_string_char(ts.b, 6);
+ uart_send_string_char(not_struct, 11);
+}
 
 void application(){
   test_heap_allocation();

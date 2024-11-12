@@ -69,12 +69,12 @@ void set_struct_tags(void *struct_address, uint32_t index) {
     char buffer[100];
 
     // 구조체 메타데이터 불러오기
-    const size_t *member_offsets = struct_member_offsets[struct_index];
-    const size_t *member_sizes = struct_member_sizes[struct_index];
-    size_t num_members = struct_member_counts[struct_index];
+    const uint32_t *member_offsets = struct_member_offsets[index];
+    const uint32_t *member_sizes = struct_member_sizes[index];
+    uint32_t num_members = struct_member_counts[index];
 
     // 분석에 필요한 멤버 변수 설정
-    uintptr_t base_address = reinterpret_cast<uintptr_t>(struct_address);
+    uintptr_t base_address = (uintptr_t)struct_address;
     uintptr_t last_tagged_address = base_address; 
 
     uint32_t current_address  = 0;
@@ -85,7 +85,7 @@ void set_struct_tags(void *struct_address, uint32_t index) {
         uintptr_t member_address = base_address + member_offsets[i];
         size_t member_size = member_sizes[i];
 
-        if (member_address < RAM_START || tagmember_address_address >= RAM_END) {
+        if (member_address < RAM_START || member_address>= RAM_END) {
             continue; // 유효하지 않은 태그 주소는 무시
         }
 
@@ -96,7 +96,7 @@ void set_struct_tags(void *struct_address, uint32_t index) {
 
             // 이전 객체에 대한 태그 설정
             while(current_address < member_address + member_size){
-                tag_address = get_tag_address(reinterpret_cast<void*>(current_address));
+                tag_address = get_tag_address((void*)current_address);
                 *tag_address = current_tag;
                 current_address += 8;
             }
@@ -104,7 +104,7 @@ void set_struct_tags(void *struct_address, uint32_t index) {
             last_tagged_address = current_address;
         }
         // 디버그 출력 (각 멤버별 태그 정보)
-        snprintf(buffer, sizeof(buffer), "Tag assigned at: %p, size: %zu, tag: %u", reinterpret_cast<void*>(member_address), member_size, current_tag);
+        snprintf(buffer, sizeof(buffer), "Tag assigned at: %p, size: %zu, tag: %u", (void*)member_address, member_size, current_tag);
         uart_debug_print(buffer);
     }
 }
