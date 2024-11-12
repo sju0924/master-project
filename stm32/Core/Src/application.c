@@ -9,6 +9,12 @@ struct test_struct{
   long long int c;
 };
 
+struct spare_struct{
+  int a;
+  char b[10];
+  long long int c;
+};
+
 void test_struct_tagging(){
   char not_struct[11]={'N','O','T',' ','S','T','R','U','C','T','\n'};
  
@@ -17,15 +23,24 @@ void test_struct_tagging(){
     ,{'A','B','C','D','E','F'}
     , 2
   };
+  struct spare_struct ss={
+    1
+    ,{'S','P','R',' ','S','T','R','U','C','\n'}
+    , 2
+  };
+
+  ss.b[13] = 'F';
+
 
   ts.b[3] = 'Z';
   
  uart_send_string_char(ts.b, 6);
+ uart_send_string_char(ss.b, 10);
  uart_send_string_char(not_struct, 11);
 }
 
 void application(){
-  test_heap_allocation();
+  test_struct_tagging();
 }
 void test_uart_print(){
     const char* msg1 = "Going on...";

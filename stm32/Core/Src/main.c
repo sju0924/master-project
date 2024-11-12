@@ -180,8 +180,8 @@ int main(void)
   // Disable MPU if no further configuration is needed or keep it enabled as required
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 
-  test_heap_allocation();
   /* USER CODE END 2 */
+  srand(SysTick->VAL);
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -189,7 +189,7 @@ int main(void)
   while (1)
   {
     
-        test_uart_print();
+        application();
 
         
     
