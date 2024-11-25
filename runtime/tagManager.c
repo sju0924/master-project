@@ -46,6 +46,28 @@ void set_tag(void *address, size_t size) {
     
 }
 
+void remove_tag(void *address, size_t size) {
+    uint8_t *tag_address;
+    char buffer[100];
+    if(tag_address = get_tag_address(address)){
+        uint8_t tag = UNPOISON_TAG;
+        
+        // 8바이트 단위로 태그 설정
+        for (size_t i = 0; i < size / 8; i++) {
+            *tag_address++ = tag;
+        }
+
+        // 남은 바이트가 있을 경우 마지막 태그 설정
+        if (size % 8 != 0) {
+            *tag_address = tag;
+        }
+        snprintf(buffer, sizeof(buffer), "Tag assigned at: %p, size: %d tag: %u", address, size, tag);
+        uart_debug_print(buffer);
+    }   
+
+    
+}
+
 void set_tag_padding(void *address, size_t size) {
     uint8_t *tag_address;
     if(tag_address = get_tag_address(address)){
@@ -158,11 +180,3 @@ uint8_t compare_tag(void* addr1, void* addr2) {
         return FALSE; // Todo: mismatch 시 오류 처리할 핸들러 생성
     }
 }
-/*
-
-Todo:
-    1. heap / Global variable 할당시 태그 부여(완료)
-    2. Stack 할당시 태그부여(완료)
-    3. Intra-struct 태그 부여
-
-*/

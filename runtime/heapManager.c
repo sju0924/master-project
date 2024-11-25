@@ -57,7 +57,7 @@ void my_free(void* ptr) {
 
     // 태그 삭제
     for (uintptr_t i = start_address; i < end_address; i += 8) {
-        set_tag((void*)i, UNPOISON_TAG);
+        remove_tag((void*)i, metadata->size);
     }
 
     // Free된 영역에 대한 MPU 보호 설정

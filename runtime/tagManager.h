@@ -16,5 +16,6 @@ uint8_t* get_tag_address(void *address);
 void set_tag(void *address, size_t size);
 void set_tag_padding(void *address, size_t size) ;
 void set_struct_tags(void *struct_address, uint32_t item_index);
+void remove_tag(void *address, size_t size);
 uint8_t get_tag(void *address);
 

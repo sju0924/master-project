@@ -48,9 +48,6 @@ void test_struct_tagging(){
  uart_send_string_char(not_struct, 11);
 }
 
-void application(){
-  test_struct_tagging();
-}
 void test_uart_print(){
     const char* msg1 = "Going on...";
     const char* msg2 = "Going off...";
