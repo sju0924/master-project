@@ -66,7 +66,7 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                 if (Function *calledFunc = CI->getCalledFunction()) {
                     if (calledFunc->getName() == "configure_mpu_redzone_for_call" ||
                         calledFunc->getName() == "configure_mpu_redzone_for_return" ||
-                        calledFunc->getName() == "llvm.dbg.value" ) {
+                        calledFunc->getName().find("llvm.") == 0 ) {
                         continue;
                     }
 

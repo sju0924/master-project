@@ -245,7 +245,7 @@ void configure_mpu_redzone_for_return() {
     // Red Zone 뒷부분 설정 (MPU 영역 1)
     MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_DISABLE, back_addr, REDZONE_SIZE/2, MPU_REGION_ALL_RO); // Red Zone 뒤쪽 설정
 
-    HAL_MPU_EnableRegion(MPU_REGION_NUMBER1);
+    HAL_MPU_EnableRegion(MPU_REGION_NUMBER0);
     HAL_MPU_EnableRegion(MPU_REGION_NUMBER1);
   
     HAL_MPU_Enable(MPU_HFNMI_PRIVDEF);
