@@ -182,7 +182,6 @@ MPU_ConfigureRegion: MPU 영역 설정
     - uint32_t access_permission: 권한
 */
 void MPU_ConfigureRegion(uint32_t region_num, uint32_t enable, uint32_t base_address, uint32_t size, uint32_t access_permission);
-uint8_t poison_queue_index = 0;
 
 void MPU_Enable(void) {
     HAL_MPU_Enable(MPU_HFNMI_PRIVDEF_NONE);

@@ -2,6 +2,7 @@ build/
 stm32/build/
 llvm/build
 runtime/build
+.vscode/
 *.ll
 *.ll.ll
 *.o

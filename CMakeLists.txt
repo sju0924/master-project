@@ -50,20 +50,33 @@ add_custom_target(firmware ALL
 add_custom_target(
     apply_pass
     DEPENDS firmware 
-    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTestPass.so -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="my-test-pass,stack-mpu-pass,heap-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/application_heap_stack_analysed.ll  ${CMAKE_BINARY_DIR}/../stm32/build/application.ll 
-    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="global-variable-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/application_output.ll  ${CMAKE_BINARY_DIR}/application_heap_stack_analysed.ll
-    # COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="null-ptr-mpu-pass" -S -o  ${CMAKE_BINARY_DIR}/drivers_analysed.ll  ${CMAKE_BINARY_DIR}/../stm32/drivers.ll
-    COMMAND llvm-link -o output.ll ${CMAKE_BINARY_DIR}/../stm32/drivers.ll  ${CMAKE_BINARY_DIR}/application_output.ll 
+
+    # Stack, Heap MPU 보호 설정
+    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTestPass.so -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="my-test-pass,stack-mpu-pass,heap-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/application_mpu_heap_stack_analysed.ll  ${CMAKE_BINARY_DIR}/../stm32/build/application.ll
+    
+    # Global Variable MPU 설정
+    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="global-variable-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/application_mpu_gv_analysed.ll  ${CMAKE_BINARY_DIR}/application_mpu_heap_stack_analysed.ll
+    
+    # Stack tag 설정 및 태그 연산 분석
+    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTestPass.so -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTagPass.so -passes="stack-tag-pass,arithmetic-pointer-tag-pass" -S -o ${CMAKE_BINARY_DIR}/application_stack_tag_output.ll  ${CMAKE_BINARY_DIR}/application_tagged.ll
+
+    # Struct 메타데이터 수집 및 전역 변수 tag 설정
+    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTagPass.so -passes="global-variable-tag-pass,struct-metadata-pass" -S -o ${CMAKE_BINARY_DIR}/application_output.ll ${CMAKE_BINARY_DIR}/application_stack_tag_output.ll
+    
+    # Null pointer mpu 보호 설정
+    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="null-ptr-mpu-pass" -S -o  ${CMAKE_BINARY_DIR}/drivers_analysed.ll  ${CMAKE_BINARY_DIR}/../stm32/drivers.ll
+
+    # Application 및 Link
+    COMMAND llvm-link -o output.ll ${CMAKE_BINARY_DIR}/drivers_analysed.ll  ${CMAKE_BINARY_DIR}/application_output.ll 
 
 )
-
 add_custom_target(
     build
     DEPENDS apply_pass
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMAND llc -filetype=obj -march=arm -mcpu=cortex-m33 --float-abi=hard output.ll -o output.o 
     COMMAND arm-none-eabi-gcc -c ../stm32/startup_stm32l562xx.s -o startup.o
-    COMMAND arm-none-eabi-gcc output.o startup.o runtime/runtime.o -DSTM32_ENV -o firmware.elf -T ../stm32/STM32L562xE_FLASH.ld -mcpu=cortex-m33 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-short-enums --specs=nosys.specs  
+    COMMAND arm-none-eabi-gcc output.o startup.o runtime/runtime.o -DSTM32_ENV -o firmware.elf -T ../stm32/STM32L562xE_SHADOW.ld -mcpu=cortex-m33 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-short-enums --specs=nosys.specs  
     COMMAND arm-none-eabi-objcopy -O binary firmware.elf firmware.bin
 
 )

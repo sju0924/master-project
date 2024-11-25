@@ -1,11 +1,11 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
-#include "runtimeConfig.h"
-
+#include "heapManager.h"
 
 
 void* my_malloc(size_t size) {
+    
+    char buffer[100];
+    uint8_t tag ;
+ 
     // 필요한 메모리 크기 계산 (요청 크기 + 메타데이터 크기 + 레드존 * 2 + 정렬 여유 공간)
     size_t total_size = size + sizeof(HeapMetadata) + REDZONE_SIZE + (ALIGNMENT - 1);
 
@@ -18,11 +18,27 @@ void* my_malloc(size_t size) {
     // 32바이트 정렬된 시작 주소 계산
     uintptr_t aligned_ptr = (raw_ptr + sizeof(HeapMetadata) + (REDZONE_SIZE / 2) + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
 
-
-    // 메타데이터 설정 
+    // 메타데이터 설정
     HeapMetadata* metadata = (HeapMetadata*)((aligned_ptr - REDZONE_SIZE/2 - sizeof(HeapMetadata)) & ~(4 - 1));
     metadata->size = size;
     metadata->raw_ptr = (void*)raw_ptr;  // 메모리 해제 시 사용할 실제 시작 주소 저장
+
+    // 태그 설정
+    // 우선 전체 할당 범위에만 태그 부여
+    set_tag((void*)aligned_ptr, size);
+
+    // 뒤쪽 남는 부분에 패딩 태그 (0x0) 설정
+    uintptr_t back_padding_start = aligned_ptr + size;
+    uintptr_t end_ptr = raw_ptr + total_size;
+
+    set_tag_padding((void*)back_padding_start,  (size_t)((aligned_ptr + size + ALIGNMENT -1)& ~(ALIGNMENT - 1) - (back_padding_start)));
+    
+
+    // 앞뒤 레드존 설정(디버깅용)
+    for (size_t i = 0; i < REDZONE_SIZE / 2; i++) {
+        ((uint8_t*)raw_ptr)[i] = 0xAA;  // 앞쪽 레드존 패턴 설정
+        ((uint8_t*)(aligned_ptr + size))[i] = 0xAA;  // 뒤쪽 레드존 패턴 설정
+    }
 
     // 32바이트 정렬된 메모리 블록의 시작 위치 반환
     return (void*)aligned_ptr;
@@ -38,6 +54,11 @@ void my_free(void* ptr) {
     // 힙 객체의 시작 및 끝 주소 계산
     uintptr_t start_address = (uintptr_t)ptr;
     uintptr_t end_address = start_address + metadata->size;
+
+    // 태그 삭제
+    for (uintptr_t i = start_address; i < end_address; i += 8) {
+        set_tag((void*)i, UNPOISON_TAG);
+    }
 
     // Free된 영역에 대한 MPU 보호 설정
     configure_mpu_for_poison((void *)(start_address), metadata->size);

@@ -172,7 +172,7 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 # LDFLAGS
 #######################################
 # link script
-LDSCRIPT = STM32L562xE_FLASH.ld
+LDSCRIPT = STM32L562xE_SHADOW.ld
 
 # libraries
 LIBS = -lc -lm -lnosys 
@@ -230,7 +230,8 @@ $(BUILD_DIR)/system_stm32l5xx.ll \
 $(BUILD_DIR)/main.ll 
 
 APPLICATION_LL_FILES = $(BUILD_DIR)/application.ll 
-APPLICATION_C_SOURCES = Core/Src/application.c \
+APPLICATION_C_SOURCES = Core/Src/application.c 
+APPLICATION_FLAGS = -Dmalloc=my_malloc -Dfree=my_free -Dmemcpy=my_memcpy -Dmemset=my_memset
 # default action: build all
 all: $(LL_FILE)
 direct: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin

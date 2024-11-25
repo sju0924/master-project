@@ -37,5 +37,6 @@ typedef struct {
 
 void configure_mpu_for_poison(void *ptr, uint32_t size) ;
 void uart_debug_print(const char *str);
+void handle_tag_mismatch(void* start, void* end);
 
 #endif  // RUNTIME_CONFIG_H

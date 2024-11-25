@@ -186,6 +186,7 @@ int main(void)
   configure_mpu_for_null_ptr();
   
   /* USER CODE END 2 */
+  srand(SysTick->VAL);
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */

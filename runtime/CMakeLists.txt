@@ -36,8 +36,10 @@ link_directories(${CMAKE_SYSROOT}/lib)
 set(RUNTIME_SRCS
     testPrint.c
     MPU.c
-    heapManager.c
     debugger.c
+    tagManager.c
+    heapManager.c
+    intrinsicFunction.c
     syscalls.c
 )
 

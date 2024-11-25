@@ -274,7 +274,7 @@ PreservedAnalyses GlobalVariableMPUPass::run(Module &M, ModuleAnalysisManager &A
     ArrayType *redzoneType = ArrayType::get(int8Ty, GLOBAL_REDZONE_SIZE); // 32바이트 레드존 타입
     const DataLayout &dataLayout = M.getDataLayout();
     
-
+    // 전역 변수 교체 및 MPU 보호 함수 호출 삽입
     std::vector<GlobalVariable*> globalsToReplace;
 
      // 레드존을 추가할 전역 변수 식별
