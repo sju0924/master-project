@@ -18,34 +18,37 @@ namespace {
     struct MyTestPass : public PassInfoMixin<MyTestPass> {
 
          PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
+
+            if (F.getName() == "__global_var_init" || F.getName() == "uart_send_string" ||  F.getName() == "HAL_UART_Transmit"){
+                return PreservedAnalyses::all();
+            }
             std::string functionName = "Function Name: " + F.getName().str();
             print_string(functionName.c_str());  // UART로 함수 이름 출력
             
-            if (strcmp(functionName.c_str(),"Function Name: uart_send_string") && strcmp(functionName.c_str(),"Function Name: HAL_UART_Transmit")){
-                print_string("insert test_print");
-                //첫 번째 블록을 선택하여 코드 삽입
-                BasicBlock &EntryBlock = F.getEntryBlock();
-                IRBuilder<> builder(&EntryBlock.front());
+           
+            print_string("insert test_print");
+            //첫 번째 블록을 선택하여 코드 삽입
+            BasicBlock &EntryBlock = F.getEntryBlock();
+            IRBuilder<> builder(&EntryBlock.front());
+            
+                // "runtime_func" 함수의 선언을 모듈에서 찾습니다.
+            Function *testPrint = F.getParent()->getFunction("test_print");
+            if (!testPrint) {
+                // 런타임 함수가 없으면 선언을 추가합니다.
+                LLVMContext &context = F.getContext();
+
+                Type *returnType = Type::getVoidTy(context);  // 반환 타입 (i8)
+                Type *int8Type = Type::getInt8Ty(context);
+                Type *paramType = PointerType::get(int8Type, 0);  // 매개변수 타입 (void)
+
+                std::vector<Type*> params;
+                params.push_back(paramType);  // 매개변수 추가
+
+                FunctionType *funcType = FunctionType::get(returnType, params, false);
+                testPrint = Function::Create(funcType, Function::ExternalLinkage, "test_print", F.getParent());
                 
-                 // "runtime_func" 함수의 선언을 모듈에서 찾습니다.
-                Function *testPrint = F.getParent()->getFunction("test_print");
-                if (!testPrint) {
-                    // 런타임 함수가 없으면 선언을 추가합니다.
-                    LLVMContext &context = F.getContext();
-
-                    Type *returnType = Type::getVoidTy(context);  // 반환 타입 (i8)
-                    Type *int8Type = Type::getInt8Ty(context);
-                    Type *paramType = PointerType::get(int8Type, 0);  // 매개변수 타입 (void)
-
-                    std::vector<Type*> params;
-                    params.push_back(paramType);  // 매개변수 추가
-
-                    FunctionType *funcType = FunctionType::get(returnType, params, false);
-                    testPrint = Function::Create(funcType, Function::ExternalLinkage, "test_print", F.getParent());
-                }
 
                 // 함수 이름을 가져와서 문자열 리터럴로 변환
-                LLVMContext &context = F.getContext();
                 Value *funcName = builder.CreateGlobalStringPtr(F.getName());
 
                 // 함수의 시작 부분에 runtime_func 호출을 삽입

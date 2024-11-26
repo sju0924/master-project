@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "application.h"
 #include <string.h>
 
 /* Private includes ----------------------------------------------------------*/
@@ -32,6 +33,12 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+// Commands of SPI Status
+#define CMD0  0x40  // GO_IDLE_STATE
+#define CMD8  0x48  // SEND_IF_COND
+#define CMD17 0x51  // READ_SINGLE_BLOCK
+#define CMD24 0x58  // WRITE_SINGLE_BLOCK
 
 /* USER CODE END PD */
 
@@ -147,26 +154,49 @@ int main(void)
   MX_TIM17_Init();
   MX_UCPD1_Init();
   MX_USB_PCD_Init();
-  /* USER CODE BEGIN 2 */
 
+  
+
+  /* USER CODE BEGIN 2 */
+  // 1. MPU 비활성화
+   // Disable MPU before configuring
+  HAL_MPU_Disable();
+  MPU_Region_InitTypeDef MPU_InitStruct = {0};
+
+  // Configure MPU Region 0 to Region 7
+    for (uint8_t region = MPU_REGION_NUMBER0; region <= MPU_REGION_NUMBER7; ++region) {
+      
+
+        MPU_InitStruct.Enable = MPU_REGION_ENABLE;
+        MPU_InitStruct.Number = region;
+        MPU_InitStruct.BaseAddress = 0x20000000 + (region * 0x100);      // 예시 시작 주소
+        MPU_InitStruct.LimitAddress = MPU_InitStruct.BaseAddress + 0x20; // 제한 주소 (예: 64KB 범위)
+        MPU_InitStruct.AttributesIndex = 0;                                // 기본 속성 인덱스
+        MPU_InitStruct.AccessPermission = MPU_REGION_ALL_RW;          // 전체 접근 권한 부여
+        MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;        // 실행 가능
+        MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE; 
+
+      HAL_MPU_ConfigRegion(&MPU_InitStruct);  // Apply configuration to current region
+      HAL_MPU_EnableRegion(region);
+      
+  }
+
+  // Disable MPU if no further configuration is needed or keep it enabled as required
+  HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+  configure_mpu_for_null_ptr();
+  
   /* USER CODE END 2 */
+  srand(SysTick->VAL);
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  
   while (1)
   {
     
-        char msg1[] = "Going on...";
-        char msg2[] = "Going off...";
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);        
-        HAL_UART_Transmit(&huart1, (uint8_t*)msg1, strlen(msg1), HAL_MAX_DELAY);
-        HAL_Delay(500);  // 500ms 대기
+        application();
 
-
-        // LED Off
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-        HAL_UART_Transmit(&huart1, (uint8_t*)msg2, strlen(msg2), HAL_MAX_DELAY);
-        HAL_Delay(500);  // 500ms 대기
+        
     
     /* USER CODE END WHILE */
 
@@ -1150,4 +1180,110 @@ void assert_failed(uint8_t *file, uint32_t line)
 
 void uart_send_string(const char *str) {
     HAL_UART_Transmit(&huart1, (uint8_t*)str, strlen(str), HAL_MAX_DELAY);
+}
+
+void uart_send_string_char(char *str, size_t size) {
+    HAL_UART_Transmit(&huart1, (uint8_t*)str, size, HAL_MAX_DELAY);
+}
+
+// SPI 데이터 전송 함수
+HAL_StatusTypeDef sd_spi_transmit(uint8_t *pData, uint16_t Size, uint32_t Timeout) {
+    return HAL_SPI_Transmit(&hspi1, pData, Size, Timeout);
+}
+
+// SPI 데이터 수신 함수
+HAL_StatusTypeDef sd_spi_receive(uint8_t *pData, uint16_t Size, uint32_t Timeout) {
+    return HAL_SPI_Receive(&hspi1, pData, Size, Timeout);
+}
+
+// SPI 데이터 전송 및 수신 함수
+HAL_StatusTypeDef sd_spi_transmit_receive(uint8_t *pTxData, uint8_t *pRxData, uint16_t Size, uint32_t Timeout) {
+    return HAL_SPI_TransmitReceive(&hspi1, pTxData, pRxData, Size, Timeout);
+}
+
+// SD 카드 선택 및 해제 (칩 선택 제어)
+void sd_select(void) {
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);  // CS 핀 LOW (선택)
+}
+
+void sd_deselect(void) {
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);    // CS 핀 HIGH (해제)
+    uint8_t dummy = 0xFF;
+    sd_spi_transmit(&dummy, 1, 100);  // 공백 클럭 전송
+}
+
+// SD 카드 명령어 전송
+HAL_StatusTypeDef sd_send_command(uint8_t cmd, uint32_t arg, uint8_t crc) {
+    uint8_t cmd_packet[6];
+    cmd_packet[0] = cmd;
+    cmd_packet[1] = (arg >> 24) & 0xFF;
+    cmd_packet[2] = (arg >> 16) & 0xFF;
+    cmd_packet[3] = (arg >> 8) & 0xFF;
+    cmd_packet[4] = arg & 0xFF;
+    cmd_packet[5] = crc;
+
+    sd_select();
+    HAL_StatusTypeDef status = sd_spi_transmit(cmd_packet, sizeof(cmd_packet), 100);
+    sd_deselect();
+
+    return status;
+}
+
+// SD 카드 초기화
+HAL_StatusTypeDef sd_initialize(void) {
+    sd_deselect();
+    for (int i = 0; i < 10; i++) {
+        uint8_t dummy = 0xFF;
+        sd_spi_transmit(&dummy, 1, 100);  // 공백 클럭 전송
+    }
+
+    if (sd_send_command(CMD0, 0, 0x95) != HAL_OK) return HAL_ERROR; // Idle 상태 전환 확인
+    if (sd_send_command(CMD8, 0x1AA, 0x87) != HAL_OK) return HAL_ERROR;  // SD 카드 버전 확인
+
+    return HAL_OK;  // 초기화 성공
+}
+
+// SD 카드 데이터 블록 쓰기
+HAL_StatusTypeDef sd_write_block(const uint8_t* data, uint32_t block_address) {
+    if (sd_send_command(CMD24, block_address, 0xFF) != HAL_OK) {
+        return HAL_ERROR;  // WRITE_SINGLE_BLOCK 실패 시 반환
+    }
+
+    uint8_t start_token = 0xFE;
+    sd_select();
+    sd_spi_transmit(&start_token, 1, 100);  // 데이터 시작 토큰 전송
+
+    // 데이터 전송
+    HAL_StatusTypeDef status = sd_spi_transmit((uint8_t *)data, 512, 1000);
+    if (status != HAL_OK) return status;
+
+    // CRC 전송 (더미 값)
+    uint8_t dummy_crc[2] = {0xFF, 0xFF};
+    sd_spi_transmit(dummy_crc, 2, 100);
+
+    // 데이터 전송 응답 대기
+    uint8_t response;
+    sd_spi_receive(&response, 1, 100);
+    if ((response & 0x1F) != 0x05) {
+        return HAL_ERROR;  // 데이터 전송 실패
+    }
+
+    sd_deselect();
+    return HAL_OK;
+}
+
+// SD 카드에 데이터를 쓰는 함수
+void sd_card_write(const char *message) {
+    uint8_t buffer[512] = {0};  // 512바이트 버퍼 초기화
+    strncpy((char*)buffer, message, sizeof(buffer) - 1);
+
+    if (sd_initialize() == HAL_OK) {
+        if (sd_write_block(buffer, 0) == HAL_OK) {  // 블록 주소 0에 쓰기
+            uart_send_string("SD card write succeeded.\n");
+        } else {
+            uart_send_string("SD card write failed.\n");
+        }
+    } else {
+        uart_send_string("SD card initialization failed.\n");
+    }
 }

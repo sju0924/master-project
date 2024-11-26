@@ -39,10 +39,13 @@ extern "C" {
 #include "stm32l5xx_ll_dma.h"
 
 #include "stm32l5xx_ll_exti.h"
+#include <stdlib.h>
+
+#include <stdlib.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <time.h>
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -67,7 +70,9 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 void uart_send_string(const char *str);
-
+void uart_send_string_char(char *str, size_t size) ;
+void sd_card_write(const char *message);
+void configure_mpu_for_null_ptr();
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

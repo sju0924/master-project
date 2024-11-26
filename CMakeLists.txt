@@ -1,4 +1,3 @@
-# set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_SYSTEM_PROCESSOR arm)
 
@@ -11,10 +10,6 @@ set(zstd_INCLUDE_DIR /usr/include)
 set(Terminfo_LIBRARIES /usr/lib/x86_64-linux-gnu/libtinfo.so)
 
 set(FFI_LIBRARIES /usr/lib/x86_64-linux-gnu/libffi.so)
-# # 크로스 컴파일러 설정
-# set(CMAKE_C_COMPILER /opt/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-gcc)
-# set(CMAKE_CXX_COMPILER /opt/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-g++)
-# set(CMAKE_ASM_COMPILER /opt/gcc-arm-none-eabi-10.3-2021.10/bin/arm-none-eabi-gcc)
 
 set(CMAKE_C_COMPILER /usr/bin/clang)
 set(CMAKE_CXX_COMPILER /usr/bin/clang++)
@@ -39,37 +34,6 @@ message(STATUS "C FLAGS: ${CMAKE_C_FLAGS}")
 # === 사용할 MCU 모델 정의 ===
 # MCU 모델 정의. STM32L562xx를 사용.
 add_definitions(-DSTM32L562xx)
-
-# === 컴파일러 플래그 설정 (임베디드 환경) ===
-
-# # MCU에 대한 설정 (STM32L5 예시)
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=cortex-m33 -mthumb")
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=cortex-m33 -mthumb")
-
-# set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/stm32/STM32L562xE_FLASH.ld)
-# set(STARTUP_FILE ${CMAKE_SOURCE_DIR}/stm32/startup_stm32l562xx.s)
-# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -T${LINKER_SCRIPT}")
-
-
-
-# === LLVM Pass 프로젝트 빌드 ===
-# LLVM Pass는 CMake로 관리되므로 add_subdirectory로 빌드
-# # CMakeLists.txt에서 헤더 파일 경로 추가
-# include_directories(${CMAKE_SOURCE_DIR}/stm32/Core/Inc)
-# include_directories(${CMAKE_SOURCE_DIR}/stm32/Drivers/STM32L5xx_HAL_Driver/Inc)
-# include_directories(${CMAKE_SOURCE_DIR}/stm32/Drivers/CMSIS/Device/ST/STM32L5xx/Include)
-# include_directories(${CMAKE_SOURCE_DIR}/stm32/Drivers/CMSIS/Include)
-
-# set(HAL_DRIVER_SRCS
-#     ${CMAKE_SOURCE_DIR}/stm32/Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_uart.c
-#     ${CMAKE_SOURCE_DIR}/stm32/Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal.c
-#     ${CMAKE_SOURCE_DIR}/stm32/Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_rcc.c
-#     ${CMAKE_SOURCE_DIR}/stm32/Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_gpio.c
-#     ${CMAKE_SOURCE_DIR}/stm32/Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_dma.c
-#     ${CMAKE_SOURCE_DIR}/stm32/Core/Src/system_stm32l5xx.c
-#     ${CMAKE_SOURCE_DIR}/stm32/Core/Src/main.c
-# )
-
 add_subdirectory(${CMAKE_SOURCE_DIR}/llvm)
 add_subdirectory(${CMAKE_SOURCE_DIR}/runtime)
 
@@ -85,19 +49,34 @@ add_custom_target(firmware ALL
 # LLVM Pass 적용 명령 추가
 add_custom_target(
     apply_pass
-    DEPENDS firmware
-    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTestPass.so -passes=my-test-pass -S -o ${CMAKE_BINARY_DIR}/output.ll  ${CMAKE_BINARY_DIR}/../stm32/input.ll 
+    DEPENDS firmware 
+
+    # Stack, Heap MPU 보호 설정
+    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="my-test-pass,stack-mpu-pass,heap-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/application_mpu_heap_stack_analysed.ll  ${CMAKE_BINARY_DIR}/../stm32/build/application.ll
+    
+    # Global Variable MPU 설정
+    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="global-variable-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/application_mpu_gv_analysed.ll  ${CMAKE_BINARY_DIR}/application_mpu_heap_stack_analysed.ll
+    
+    # Stack tag 설정 및 태그 연산 분석
+    COMMAND opt  -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTagPass.so -passes="stack-tag-pass,arithmetic-pointer-tag-pass" -S -o ${CMAKE_BINARY_DIR}/application_stack_tag_output.ll  ${CMAKE_BINARY_DIR}/application_tagged.ll
+
+    # Struct 메타데이터 수집 및 전역 변수 tag 설정
+    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTagPass.so -passes="global-variable-tag-pass,struct-metadata-pass" -S -o ${CMAKE_BINARY_DIR}/application_output.ll ${CMAKE_BINARY_DIR}/application_stack_tag_output.ll
+    
+    # Null pointer mpu 보호 설정
+    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="null-ptr-mpu-pass" -S -o  ${CMAKE_BINARY_DIR}/drivers_analysed.ll  ${CMAKE_BINARY_DIR}/../stm32/drivers.ll
+
+    # Application 및 Link
+    COMMAND llvm-link -o output.ll ${CMAKE_BINARY_DIR}/drivers_analysed.ll  ${CMAKE_BINARY_DIR}/application_output.ll 
 
 )
-
 add_custom_target(
     build
     DEPENDS apply_pass
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMAND llc -filetype=obj -march=arm -mcpu=cortex-m33 --float-abi=hard output.ll -o output.o 
     COMMAND arm-none-eabi-gcc -c ../stm32/startup_stm32l562xx.s -o startup.o
-    COMMAND arm-none-eabi-gcc -c ../runtime/testPrint.c -o runtime.o
-    COMMAND arm-none-eabi-gcc output.o startup.o runtime.o -DSTM32_ENV -o firmware.elf -T ../stm32/STM32L562xE_FLASH.ld -mcpu=cortex-m33 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-short-enums --specs=nosys.specs  
+    COMMAND arm-none-eabi-gcc output.o startup.o runtime/runtime.o -DSTM32_ENV -o firmware.elf -T ../stm32/STM32L562xE_SHADOW.ld -mcpu=cortex-m33 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-short-enums --specs=nosys.specs  
     COMMAND arm-none-eabi-objcopy -O binary firmware.elf firmware.bin
 
 )
