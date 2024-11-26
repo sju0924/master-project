@@ -1,3 +1,5 @@
+#include "test_cases_CWE121_Stack_Based_Buffer_Overflow.h"
+
 void test_uart_print();
 void test_heap_allocation();
 void test_buffer_overflow();

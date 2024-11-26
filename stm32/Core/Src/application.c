@@ -21,8 +21,10 @@ char log_buffer[512];
 int buffer[10];
 
 void application(){
-  test_buffer_overflow();
-  
+  CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good();
+  const char* msg1 = "Good passed\n";
+  uart_send_string(msg1);
+  CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_bad();
 }
 void test_struct_tagging(){
   char not_struct[11]={'N','O','T',' ','S','T','R','U','C','T','\n'};

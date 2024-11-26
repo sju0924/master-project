@@ -190,7 +190,7 @@ void MPU_Enable(void) {
      }
 }
 
-void configure_mpu_redzone_for_call(uint32_t sp, uint32_t r7) {
+int configure_mpu_redzone_for_call(uint32_t sp, uint32_t r7) {
 
     HAL_MPU_Disable();
 
@@ -219,6 +219,8 @@ void configure_mpu_redzone_for_call(uint32_t sp, uint32_t r7) {
     MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_ENABLE, back_addr, REDZONE_SIZE/2, MPU_REGION_PRIV_RO); // Red Zone 뒤쪽 설정
   
     HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+
+    return 0;
 }
 
 void configure_mpu_redzone_for_return() {

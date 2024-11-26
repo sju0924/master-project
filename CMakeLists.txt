@@ -77,9 +77,9 @@ add_custom_target(
     build
     DEPENDS apply_pass
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMAND llc -filetype=obj -march=arm -mcpu=cortex-m33 --float-abi=hard output.ll -o output.o 
+    COMMAND llc -O0 -filetype=obj -march=arm -mcpu=cortex-m33 --float-abi=hard  -disable-memop-opt output.ll -o output.o 
     COMMAND arm-none-eabi-gcc -c ../stm32/startup_stm32l562xx.s -o startup.o
-    COMMAND arm-none-eabi-gcc output.o startup.o runtime/runtime.o -DSTM32_ENV -o firmware.elf -T ../stm32/STM32L562xE_SHADOW.ld -mcpu=cortex-m33 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-short-enums --specs=nosys.specs  
+    COMMAND arm-none-eabi-gcc output.o startup.o runtime/runtime.o -DSTM32_ENV -o firmware.elf -T ../stm32/STM32L562xE_SHADOW.ld -mcpu=cortex-m33 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-short-enums --specs=nosys.specs   
     COMMAND arm-none-eabi-objcopy -O binary firmware.elf firmware.bin
 
 )

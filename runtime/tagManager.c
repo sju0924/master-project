@@ -32,7 +32,8 @@ void set_tag(void *address, size_t size) {
         
         // 8바이트 단위로 태그 설정
         for (size_t i = 0; i < size / 8; i++) {
-            *tag_address++ = tag;
+            *tag_address = tag;
+            tag_address++;
         }
 
         // 남은 바이트가 있을 경우 마지막 태그 설정

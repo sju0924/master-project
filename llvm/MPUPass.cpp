@@ -34,9 +34,14 @@ PreservedAnalyses StackMPUPass::run(Function &F,
         "sub sp, 72", "", true);
 
     InlineAsm *AddRSP = InlineAsm::get(
-        FunctionType::get(Type::getVoidTy(context), false),
-        "add sp, 72", "", true);
-    
+    FunctionType::get(Type::getVoidTy(context), false),
+    "add sp, 72", "", true);
+
+    //메모리 배리어
+    InlineAsm *MemoryBarrier = InlineAsm::get(
+    FunctionType::get(Type::getVoidTy(context), false),
+    "dmb sy", "", true // 명령어 강제 적용
+);
     // `sp` 값을 불러오는 인라인 ASM
     InlineAsm *AsmSp = InlineAsm::get(
         FunctionType::get(Type::getInt32Ty(context), false), 
@@ -67,7 +72,7 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                 if (Function *calledFunc = CI->getCalledFunction()) {
                     if (calledFunc->getName() == "configure_mpu_redzone_for_call" ||
                         calledFunc->getName() == "configure_mpu_redzone_for_return" ||
-                        calledFunc->getName().find("llvm.") == 0 ) {
+                        (calledFunc->getName().find("llvm.") == 0 && calledFunc->getName().find("mem") == std::string::npos) ) {
                         continue;
                     }
 
@@ -88,20 +93,20 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                 
                 // 함수 호출 전: "sub rsp, 64" 삽입
                 IRBuilder<> BuilderBefore(CI);
-                BuilderBefore.SetInsertPoint(CI); 
+                BuilderBefore.SetInsertPoint(CI);
                 BuilderBefore.CreateCall(SubRSP);
 
                 // 함수 호출 후: "add rsp, 64" 삽입
                 ++I; // Move iterator to the next instruction
                 if (I != BB.end()) { // Check if iterator is still valid
                     IRBuilder<> BuilderAfter(&*I);                    
-                    BuilderAfter.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});       
+                    BuilderAfter.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});
                     BuilderAfter.CreateCall(AddRSP);             
                 }
                 else{
                     IRBuilder<> BuilderRedzone(CI->getNextNode());                    
-                    BuilderRedzone.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});      
-                    BuilderRedzone.CreateCall(AddRSP);              
+                    BuilderRedzone.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});   
+                    BuilderRedzone.CreateCall(AddRSP);         
                 }
                 
                 --I; 
