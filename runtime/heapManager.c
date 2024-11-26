@@ -27,19 +27,6 @@ void* my_malloc(size_t size) {
     // 우선 전체 할당 범위에만 태그 부여
     set_tag((void*)aligned_ptr, size);
 
-    // 뒤쪽 남는 부분에 패딩 태그 (0x0) 설정
-    uintptr_t back_padding_start = aligned_ptr + size;
-    uintptr_t end_ptr = raw_ptr + total_size;
-
-    set_tag_padding((void*)back_padding_start,  (size_t)((aligned_ptr + size + ALIGNMENT -1)& ~(ALIGNMENT - 1) - (back_padding_start)));
-    
-
-    // 앞뒤 레드존 설정(디버깅용)
-    for (size_t i = 0; i < REDZONE_SIZE / 2; i++) {
-        ((uint8_t*)raw_ptr)[i] = 0xAA;  // 앞쪽 레드존 패턴 설정
-        ((uint8_t*)(aligned_ptr + size))[i] = 0xAA;  // 뒤쪽 레드존 패턴 설정
-    }
-
     // 32바이트 정렬된 메모리 블록의 시작 위치 반환
     return (void*)aligned_ptr;
 }
@@ -57,7 +44,7 @@ void my_free(void* ptr) {
 
     // 태그 삭제
     for (uintptr_t i = start_address; i < end_address; i += 8) {
-        set_tag((void*)i, UNPOISON_TAG);
+        remove_tag((void*)i, metadata->size);
     }
 
     // Free된 영역에 대한 MPU 보호 설정

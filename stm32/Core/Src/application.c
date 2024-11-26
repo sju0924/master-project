@@ -21,7 +21,7 @@ char log_buffer[512];
 int buffer[10];
 
 void application(){
-  test_uart_print();
+  test_buffer_overflow();
   
 }
 void test_struct_tagging(){
@@ -48,12 +48,9 @@ void test_struct_tagging(){
  uart_send_string_char(not_struct, 11);
 }
 
-void application(){
-  test_struct_tagging();
-}
 void test_uart_print(){
-    const char* msg1 = "Going on...";
-    const char* msg2 = "Going off...";
+    const char* msg1 = "Going on...\n";
+    const char* msg2 = "Going off...\n";
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);        
     uart_send_string(msg1);
     HAL_Delay(500);  // 500ms 대기

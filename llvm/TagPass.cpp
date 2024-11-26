@@ -302,6 +302,7 @@ PreservedAnalyses StructMetadataPass::run(Module &M, ModuleAnalysisManager &AM) 
         std::vector<Constant *> offsetsGlobalArray;
         std::vector<Constant *> sizesGlobalArray;
 
+
         for (size_t i = 0; i < offsetsArray.size(); ++i) {
             ArrayType *innerOffsetsArrayType = ArrayType::get(Type::getInt32Ty(Context), offsetsArray[i].size());
             ArrayType *innerSizesArrayType = ArrayType::get(Type::getInt32Ty(Context), sizesArray[i].size());

@@ -194,18 +194,21 @@ void configure_mpu_redzone_for_call(uint32_t sp, uint32_t r7) {
 
     HAL_MPU_Disable();
 
+    #ifdef DEBUG
     char buffer[100];
     snprintf(buffer, sizeof(buffer), "Stack Pointer and R7 values:  SP: %p, R7: %p", sp, r7);
     uart_debug_print(buffer);
+    #endif
 
     // Red Zone의 앞뒤 주소 계산
     uint32_t front_addr = sp & ~(uintptr_t)(ALIGNMENT - 1); // Redzone 0이 시작되는 주소
     uint32_t back_addr = (r7 + ALIGNMENT - 1) & ~(uintptr_t)(ALIGNMENT - 1);; // Redzone 1이 시작하는 주소
 
     // 디버그
-
+    #ifdef DEBUG
     snprintf(buffer, sizeof(buffer), "Stack MPU started: %p, ended: %p", (void *)front_addr, (void *)back_addr);
     uart_debug_print(buffer);
+    #endif
 
     
 
@@ -234,9 +237,11 @@ void configure_mpu_redzone_for_return() {
     uint32_t back_addr = r7; // Redzone 1이 시작하는 주소
 
     // 디버그
+    #ifdef DEBUG
     char buffer[100];
     snprintf(buffer, sizeof(buffer), "Unset Stack Pointer and R7 values:  SP: %x, R7: %x", sp, r7);
     uart_debug_print(buffer);
+    #endif
 
 
     // Red Zone 앞부분 설정 (MPU 영역 0)
@@ -245,7 +250,7 @@ void configure_mpu_redzone_for_return() {
     // Red Zone 뒷부분 설정 (MPU 영역 1)
     MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_DISABLE, back_addr, REDZONE_SIZE/2, MPU_REGION_ALL_RO); // Red Zone 뒤쪽 설정
 
-    HAL_MPU_EnableRegion(MPU_REGION_NUMBER1);
+    HAL_MPU_EnableRegion(MPU_REGION_NUMBER0);
     HAL_MPU_EnableRegion(MPU_REGION_NUMBER1);
   
     HAL_MPU_Enable(MPU_HFNMI_PRIVDEF);
@@ -270,11 +275,14 @@ void configure_mpu_redzone_for_heap_access(void* ptr){
     end_addr = (end_addr + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
 
     // 디버그
+    #ifdef DEBUG
     char buffer[100];
-    snprintf(buffer, sizeof(buffer), "Set Heap redzone:  ptr: %p, size: %d", (void*)ptr, (void*)metadata->size);
+    snprintf(buffer, sizeof(buffer), "Set Heap redzone: ptr: %p, size: %d", (void*)ptr, metadata->size);
     uart_debug_print(buffer);
     snprintf(buffer, sizeof(buffer), "Heap MPU started: %p, ended: %p", (void *)start_addr, (void *)end_addr);
     uart_debug_print(buffer);
+    #endif
+    
 
 
 
@@ -301,9 +309,11 @@ void configure_mpu_redzone_for_global(void *ptr, uint64_t size) {
     end_addr = (end_addr + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
 
     // 디버그
+    #ifdef DEBUG
     char buffer[100];
     snprintf(buffer, sizeof(buffer), "Set Global redzone:  Start address: %p, end address: %p, global variable start: %p", (void*)start_addr, (void*)end_addr, ptr);
     uart_debug_print(buffer);
+    #endif
 
 
     // Red Zone 앞부분 설정 (MPU 영역 4)
@@ -327,9 +337,11 @@ void configure_mpu_for_poison(void *ptr, uint32_t size) {
     end_addr = (end_addr+ ALIGNMENT - 1) & ~(ALIGNMENT - 1);
 
     // 디버그
+    #ifdef DEBUG
     char buffer[100];
     snprintf(buffer, sizeof(buffer), "Set MPU-Protected Poison:  Start address: %p, end address: %p, size: %zu\r\n", (void*)start_addr, (void*)end_addr, (size_t)(end_addr-start_addr));
     uart_debug_print(buffer);
+    #endif
 
 
 
@@ -348,10 +360,11 @@ void configure_mpu_for_null_ptr(){
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 
    // 디버그
-    char buffer[100];
-    snprintf(buffer, sizeof(buffer), "Set MPU-Protected NullPtr\r\n");
- 
-    uart_debug_print(buffer);
+  #ifdef DEBUG
+  char buffer[100];
+  snprintf(buffer, sizeof(buffer), "Set MPU-Protected NullPtr\r\n"); 
+  uart_debug_print(buffer);
+  #endif
 }
 
 

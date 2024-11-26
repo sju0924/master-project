@@ -51,17 +51,20 @@ add_custom_target(
     apply_pass
     DEPENDS firmware 
 
-    # Stack, Heap MPU 보호 설정
-    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="my-test-pass,stack-mpu-pass,heap-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/application_mpu_heap_stack_analysed.ll  ${CMAKE_BINARY_DIR}/../stm32/build/application.ll
-    
-    # Global Variable MPU 설정
-    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="global-variable-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/application_mpu_gv_analysed.ll  ${CMAKE_BINARY_DIR}/application_mpu_heap_stack_analysed.ll
+   
+    # Struct 메타데이터 수집 및 전역 변수 tag 설정
+    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTagPass.so -passes="struct-metadata-pass,global-variable-tag-pass" -S -o ${CMAKE_BINARY_DIR}/application_tag_gv_struct_output.ll ${CMAKE_BINARY_DIR}/../stm32/build/application.ll
     
     # Stack tag 설정 및 태그 연산 분석
-    COMMAND opt  -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTagPass.so -passes="stack-tag-pass,arithmetic-pointer-tag-pass" -S -o ${CMAKE_BINARY_DIR}/application_stack_tag_output.ll  ${CMAKE_BINARY_DIR}/application_tagged.ll
+    COMMAND opt  -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTagPass.so -passes="stack-tag-pass,arithmetic-pointer-tag-pass" -S -o ${CMAKE_BINARY_DIR}/application_tag_stack_arith_output.ll  ${CMAKE_BINARY_DIR}/application_tag_gv_struct_output.ll
 
-    # Struct 메타데이터 수집 및 전역 변수 tag 설정
-    COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTagPass.so -passes="global-variable-tag-pass,struct-metadata-pass" -S -o ${CMAKE_BINARY_DIR}/application_output.ll ${CMAKE_BINARY_DIR}/application_stack_tag_output.ll
+     # Stack, Heap MPU 보호 설정
+     COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTestPass.so -passes="my-test-pass,stack-mpu-pass,heap-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/application_mpu_heap_stack_analysed.ll ${CMAKE_BINARY_DIR}/application_tag_stack_arith_output.ll
+    
+     # Global Variable MPU 설정
+     COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="global-variable-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/application_output.ll  ${CMAKE_BINARY_DIR}/application_mpu_heap_stack_analysed.ll
+     
+
     
     # Null pointer mpu 보호 설정
     COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="null-ptr-mpu-pass" -S -o  ${CMAKE_BINARY_DIR}/drivers_analysed.ll  ${CMAKE_BINARY_DIR}/../stm32/drivers.ll

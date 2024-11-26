@@ -8,5 +8,6 @@ void test_gv_overflow();
 void test_gv_underflow();
 void test_nullptr_derefence();
 void test_UAF();
+void test_struct_tagging();
 
 void application();
