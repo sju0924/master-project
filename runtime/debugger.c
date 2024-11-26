@@ -10,8 +10,8 @@ uint8_t* get_tag_address(void *address);
 
 // 오류 원인 타입 정의
 typedef enum {   
-    ERROR_BUFFER_UNDERFLOW,
-    ERROR_BUFFER_OVERFLOW,
+    ERROR_STACK_UNDERFLOW,
+    ERROR_STACK_OVERFLOW,
     ERROR_HEAP_UNDERFLOW,
     ERROR_HEAP_OVERFLOW,
     ERROR_GLOBAL_VARIABLE_UNDERFLOW,
@@ -52,9 +52,9 @@ void log_error(ErrorInfo* info) {
     const char* error_cause;
     if (info->type == ERROR_TAG_MISMATCH) {
         error_cause = "Tag Mismatch Detected";
-    } else if (info->type == ERROR_BUFFER_OVERFLOW) {
+    } else if (info->type == ERROR_STACK_OVERFLOW) {
         error_cause = "Stack Overflow Detected";
-    } else if (info->type == ERROR_BUFFER_UNDERFLOW) {
+    } else if (info->type == ERROR_STACK_UNDERFLOW) {
         error_cause = "Stack Underflow Detected";
     }else if (info->type == ERROR_HEAP_OVERFLOW) {
         error_cause = "Heap Overflow Detected";
@@ -63,7 +63,7 @@ void log_error(ErrorInfo* info) {
     } else if (info->type == ERROR_GLOBAL_VARIABLE_OVERFLOW) {
         error_cause = "Global Variable Overflow Detected";
     } else if (info->type == ERROR_GLOBAL_VARIABLE_UNDERFLOW) {
-        error_cause = "Global Variable Overflow Detected";
+        error_cause = "Global Variable Underflow Detected";
     } else if (info->type == ERROR_USE_AFTER_FREE) {
         error_cause = "Use After Free Detected";
     } else if (info->type == ERROR_NULL_PTR) {
@@ -152,12 +152,11 @@ void MemManage_Handler(void) {
         // MPU_RLAR 레지스터에서 리전의 Limit address 읽기
         uint32_t limit_address = *((volatile uint32_t*)0xE000EDA0) & 0xFFFFFFE0;
 
-
-        // fault_address가 해당 리전의 주소 범위에 있는지 확인
-        if (info.fault_address  >= base_address && info.fault_address  <= limit_address) {
-            snprintf(log_buffer + strlen(log_buffer), sizeof(log_buffer) - strlen(log_buffer),
+        snprintf(log_buffer, sizeof(log_buffer) ,
                  "Region: %d, Base Address: %p, Limit Address: %p, Fault Address: %p\r\n", region, base_address, limit_address, info.fault_address);
-            uart_debug_print(log_buffer);
+        uart_debug_print(log_buffer);
+        // fault_address가 해당 리전의 주소 범위에 있는지 확인
+        if (info.fault_address  >= base_address && info.fault_address  <= limit_address + REDZONE_SIZE/2) {
             info.type = (ErrorType)region;
             info.mpu_region = region;
             break;

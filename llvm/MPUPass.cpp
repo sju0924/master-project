@@ -2,12 +2,13 @@
 
 PreservedAnalyses StackMPUPass::run(Function &F,
                                       FunctionAnalysisManager &AM) {
-  errs() << "Analyzing function: " << F.getName() << "\n";
+  
 
     
-    if (F.getName() == "configure_mpu_redzone_for_call" || F.getName() == "configure_mpu_redzone_for_return") {
+    if (F.getName() == "configure_mpu_redzone_for_call" || F.getName() == "configure_mpu_redzone_for_return" || F.getName()=="__global_var_init" || F.getName()=="set_tag" || F.getName()=="my_malloc" || F.getName()=="my_free" ) {
         return PreservedAnalyses::none();
     }
+    errs() << "Analyzing function: " << F.getName() << "\n";
     // 함수 실행 시 Stack Redzone 설정
     Module *M = F.getParent();
     
@@ -93,14 +94,14 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                 // 함수 호출 후: "add rsp, 64" 삽입
                 ++I; // Move iterator to the next instruction
                 if (I != BB.end()) { // Check if iterator is still valid
-                    IRBuilder<> BuilderAfter(&*I);
-                    BuilderAfter.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});
-                    BuilderAfter.CreateCall(AddRSP);
+                    IRBuilder<> BuilderAfter(&*I);                    
+                    BuilderAfter.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});       
+                    BuilderAfter.CreateCall(AddRSP);             
                 }
                 else{
-                    IRBuilder<> BuilderRedzone(CI->getNextNode());
-                    BuilderRedzone.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});
-                    BuilderRedzone.CreateCall(AddRSP);
+                    IRBuilder<> BuilderRedzone(CI->getNextNode());                    
+                    BuilderRedzone.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});      
+                    BuilderRedzone.CreateCall(AddRSP);              
                 }
                 
                 --I; 
@@ -114,7 +115,7 @@ PreservedAnalyses StackMPUPass::run(Function &F,
         if (ReturnInst *Ret = dyn_cast<ReturnInst>(BB.getTerminator())) {
             IRBuilder<> RetBuilder(Ret);
 
-            FunctionCallee configureMPURedzoneForReturn = M->getOrInsertFunction(
+             FunctionCallee configureMPURedzoneForReturn = M->getOrInsertFunction(
                 "configure_mpu_redzone_for_return",
                 Type::getVoidTy(context)  // 반환 타입 (void)
             );
@@ -287,7 +288,11 @@ PreservedAnalyses GlobalVariableMPUPass::run(Module &M, ModuleAnalysisManager &A
         Type *originalType = GV->getValueType();
         uint64_t globalSize = dataLayout.getTypeAllocSize(originalType); // 전역 변수 크기 계산
 
-        if (GV && GV->getName().str().find("_with_redzone") != std::string::npos){
+        if (GV && (GV->getName().str().find("_with_redzone") != std::string::npos ||GV->getName().str().find(".") != std::string::npos)){
+            continue;
+        }
+
+        if (GV && (GV->getName().str() == "struct_member_offsets" ||GV->getName().str() == "struct_member_sizes" ||GV->getName().str() == "struct_member_counts")){
             continue;
         }
 
