@@ -39,8 +39,11 @@ void set_tag(void *address, size_t size) {
         if (size % 8 != 0) {
             *tag_address = tag;
         }
+
+        #ifdef DEBUG
         snprintf(buffer, sizeof(buffer), "Tag assigned at: %p, size: %d tag: %u", address, size, tag);
         uart_debug_print(buffer);
+        #endif
     }   
 
     
@@ -61,8 +64,11 @@ void remove_tag(void *address, size_t size) {
         if (size % 8 != 0) {
             *tag_address = tag;
         }
+
+        #ifdef DEBUG
         snprintf(buffer, sizeof(buffer), "Tag assigned at: %p, size: %d tag: %u", address, size, tag);
         uart_debug_print(buffer);
+        #endif
     }   
 
     
@@ -107,7 +113,8 @@ void set_struct_tags(void *struct_address, uint32_t item_index) {
     uint8_t current_tag = 0;
     uint8_t *tag_address;
 
-    
+
+    #ifdef DEBUG
     if(num_members){//debug
         snprintf(buffer, sizeof(buffer), "Tag metadata size: %zu, base address: %p\n", num_members, base_address + member_offsets[0]);
         uart_debug_print(buffer);   
@@ -116,13 +123,16 @@ void set_struct_tags(void *struct_address, uint32_t item_index) {
         snprintf(buffer, sizeof(buffer), "Second element of member_offsets: %zu, size: %zu\n", member_offsets[1], member_sizes[1]);
         uart_debug_print(buffer);  
     }
+    #endif
      
     for (uint32_t i = 0; i < num_members; i++) {
         uintptr_t member_address = base_address + member_offsets[i];
         uint32_t member_size = (uint32_t)member_sizes[i];
 
+        #ifdef DEBUG
         snprintf(buffer, sizeof(buffer), "Member address: %d, member size: %zu\n", member_address, member_size);
         uart_debug_print(buffer);
+        #endif
 
         if (member_address < RAM_START || member_address>= RAM_END) {
             continue; // 유효하지 않은 태그 주소는 무시
@@ -143,8 +153,10 @@ void set_struct_tags(void *struct_address, uint32_t item_index) {
             last_tagged_address = current_address;
 
             // 디버그 출력 (각 멤버별 태그 정보)
+            #ifdef DEBUG
             snprintf(buffer, sizeof(buffer), "Tag assigned: %u\n",  current_tag);
             uart_debug_print(buffer);
+            #endif
         }
 
     }
@@ -170,12 +182,16 @@ uint8_t compare_tag(void* addr1, void* addr2) {
 
     // 태그 값 비교
     if (*tag1 == *tag2) {
+        #ifdef DEBUG
         snprintf(buffer, sizeof(buffer), "Tags match for addresses:  from: %p, to: %p", addr1, addr2);
         uart_debug_print(buffer);
+        #endif
         return TRUE;
     } else {
+        #ifdef DEBUG
         snprintf(buffer, sizeof(buffer), "Tags mismatch for addresses:  from: %p(%u), to: %p(%u)", addr1, *tag1, addr2, *tag2);
         uart_debug_print(buffer);
+        #endif
         handle_tag_mismatch(addr1, addr2);
         return FALSE; // Todo: mismatch 시 오류 처리할 핸들러 생성
     }
