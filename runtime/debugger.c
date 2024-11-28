@@ -156,7 +156,7 @@ void MemManage_Handler(void) {
                  "Region: %d, Base Address: %p, Limit Address: %p, Fault Address: %p\r\n", region, base_address, limit_address, info.fault_address);
         uart_debug_print(log_buffer);
         // fault_address가 해당 리전의 주소 범위에 있는지 확인
-        if (info.fault_address  >= base_address && info.fault_address  <= limit_address + REDZONE_SIZE/2) {
+        if (info.fault_address  >= base_address && info.fault_address  < limit_address + REDZONE_SIZE/2) {
             info.type = (ErrorType)region;
             info.mpu_region = region;
             break;
