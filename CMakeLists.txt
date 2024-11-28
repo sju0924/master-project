@@ -58,13 +58,13 @@ add_custom_target(
     # Stack tag 설정 및 태그 연산 분석
     COMMAND opt  -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTagPass.so -passes="stack-tag-pass,arithmetic-pointer-tag-pass" -S -o ${CMAKE_BINARY_DIR}/application_tag_stack_arith_output.ll  ${CMAKE_BINARY_DIR}/application_tag_gv_struct_output.ll
 
-     # Stack, Heap MPU 보호 설정
-     COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTestPass.so -passes="my-test-pass,stack-mpu-pass,heap-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/application_mpu_heap_stack_analysed.ll ${CMAKE_BINARY_DIR}/application_tag_stack_arith_output.ll
+   
     
      # Global Variable MPU 설정
-     COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="global-variable-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/application_output.ll  ${CMAKE_BINARY_DIR}/application_mpu_heap_stack_analysed.ll
+     COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="global-variable-mpu-pass" -S -o  ${CMAKE_BINARY_DIR}/application_mpu_gv_analysed.ll ${CMAKE_BINARY_DIR}/application_tag_stack_arith_output.ll
      
-
+      # Stack, Heap MPU 보호 설정
+      COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libTestPass.so -passes="my-test-pass,heap-mpu-pass,stack-mpu-pass" -S -o ${CMAKE_BINARY_DIR}/application_output.ll  ${CMAKE_BINARY_DIR}/application_mpu_gv_analysed.ll
     
     # Null pointer mpu 보호 설정
     COMMAND opt -load-pass-plugin=${CMAKE_BINARY_DIR}/llvm/libMPUPass.so -passes="null-ptr-mpu-pass" -S -o  ${CMAKE_BINARY_DIR}/drivers_analysed.ll  ${CMAKE_BINARY_DIR}/../stm32/drivers.ll
@@ -77,8 +77,9 @@ add_custom_target(
     build
     DEPENDS apply_pass
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMAND clang  -target arm-none-eabi -O0 -mcpu=cortex-m33  -mthumb -mfloat-abi=hard -S -o output.s output.ll
-    COMMAND arm-none-eabi-gcc -c output.s -o output.o
+    COMMAND llc -O2 -march=arm --mcpu=cortex-m33 --float-abi=hard -filetype=asm -o output.s output.ll
+    COMMAND python3 ../tool/fix_sp.py ${CMAKE_BINARY_DIR}/output.s
+    COMMAND arm-none-eabi-as  fixed_output.s -o output.o
     COMMAND arm-none-eabi-gcc -c ../stm32/startup_stm32l562xx.s -o startup.o
     COMMAND arm-none-eabi-gcc output.o startup.o runtime/runtime.o -DSTM32_ENV -o firmware.elf -T ../stm32/STM32L562xE_SHADOW.ld -mcpu=cortex-m33 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-short-enums --specs=nosys.specs   
     COMMAND arm-none-eabi-objcopy -O binary firmware.elf firmware.bin

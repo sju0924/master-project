@@ -1,0 +1,2 @@
+void CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good_without_pass();
+void CWE122_Heap_Based_Buffer_Overflow__c_CWE805_wchar_t_memmove_01_good_without_pass();

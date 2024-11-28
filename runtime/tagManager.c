@@ -66,11 +66,12 @@ void remove_tag(void *address, size_t size) {
             *tag_address = tag;
         }
 
-        #ifdef DEBUG
-        snprintf(buffer, sizeof(buffer), "Tag assigned at: %p, size: %d tag: %u", address, size, tag);
-        uart_debug_print(buffer);
-        #endif
+        
     }   
+    #ifdef DEBUG
+    snprintf(buffer, sizeof(buffer), "Tag removed at: %p, size: %d tag: %u", address, size, UNPOISON_TAG);
+    uart_debug_print(buffer);
+    #endif
 
     
 }

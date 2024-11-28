@@ -1,5 +1,6 @@
 #include "main.h"
 #include "application.h"
+#include "testcase_without_pass.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -21,10 +22,51 @@ char log_buffer[512];
 int buffer[10];
 
 void application(){
-  CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good();
-  const char* msg1 = "Good passed\n";
+  uint32_t start_tick, end_tick, elapsed_ticks, timer_clock;
+  float resolution, elapsed_time_us;
+
+  //StartTimer(); 
+  //resolution = CalculateTimerResolution();
+
+  // Pass 적용 시간 측정
+  start_tick = HAL_GetTick();
+
+  for(int i = 0 ; i<100 ; i++){
+    //CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good();
+    CWE122_Heap_Based_Buffer_Overflow__c_CWE805_wchar_t_memmove_01_good();
+  }
+  
+  end_tick = HAL_GetTick();
+
+
+  elapsed_ticks = end_tick - start_tick;
+
+  // Pass 적용 시간 출력
+  sprintf(log_buffer, "Execution Time With Pass: %u ms, start tick: %u, end tick: %u\r\n", elapsed_ticks, start_tick, end_tick);
+  uart_send_string(log_buffer);
+
+
+  // Pass 적용 전 시간 측정
+  start_tick = HAL_GetTick();
+
+  for(int i = 0 ; i<100 ; i++){
+    //CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good_without_pass();
+    CWE122_Heap_Based_Buffer_Overflow__c_CWE805_wchar_t_memmove_01_good_without_pass();
+  }
+  
+  end_tick = HAL_GetTick();
+
+
+  elapsed_ticks = end_tick - start_tick;
+
+  // Pass 적용 전 출력
+  sprintf(log_buffer, "Execution Time With Pass: %u ms, start tick: %u, end tick: %u\r\n", elapsed_ticks, start_tick, end_tick);
+  uart_send_string(log_buffer);
+
+  const char* msg1 = "Good passed\r\n";
   uart_send_string(msg1);
-  CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_bad();
+  //CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_bad();
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE805_wchar_t_memmove_01_bad();
 }
 void test_struct_tagging(){
   char not_struct[11]={'N','O','T',' ','S','T','R','U','C','T','\n'};

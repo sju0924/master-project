@@ -99,13 +99,18 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                 // 함수 호출 후: "add rsp, 64" 삽입
                 ++I; // Move iterator to the next instruction
                 if (I != BB.end()) { // Check if iterator is still valid
-                    IRBuilder<> BuilderAfter(&*I);                    
-                    BuilderAfter.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});
+                    IRBuilder<> BuilderAfter(&*I); 
+                    if (F.getName() != "configure_mpu_redzone_for_heap_access" && F.getName() != "configure_mpu_redzone_for_global" && F.getName() != "configure_mpu_for_poison"&& F.getName() != "set_tag"){
+                        BuilderAfter.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});   
+                    }                         
+                    
                     BuilderAfter.CreateCall(AddRSP);             
                 }
                 else{
                     IRBuilder<> BuilderRedzone(CI->getNextNode());                    
-                    BuilderRedzone.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});   
+                    if (F.getName() != "configure_mpu_redzone_for_heap_access" && F.getName() != "configure_mpu_redzone_for_global" && F.getName() != "configure_mpu_for_poison"&& F.getName() != "set_tag"){
+                        BuilderRedzone.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});   
+                    }
                     BuilderRedzone.CreateCall(AddRSP);         
                 }
                 

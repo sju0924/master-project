@@ -40,6 +40,7 @@ Core/Src/main.c \
 Core/Src/stm32l5xx_it.c \
 Core/Src/stm32l5xx_hal_msp.c \
 Core/Src/io.c \
+Core/Src/testcase_without_pass.c\
 Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_utils.c \
 Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_exti.c \
 Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_adc.c \
@@ -157,7 +158,7 @@ CFLAGS += $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction
 
 TARGET_TRIPLE = arm-none-eabi
 GCC_ARM_PATH = /opt/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-eabi
-LLVM_FLAGS = -O1 -emit-llvm -S --target=$(TARGET_TRIPLE) $(MCU) $(C_DEFS) $(C_INCLUDES)
+LLVM_FLAGS = -O2 -emit-llvm -S --target=$(TARGET_TRIPLE) $(MCU) $(C_DEFS) $(C_INCLUDES)
 LLVM_FLAGS += --sysroot=$(GCC_ARM_PATH)/arm-none-eabi --gcc-toolchain=$(GCC_ARM_PATH) -Wall -fdata-sections -ffunction-sections -fno-inline -fno-elide-constructors -fno-builtin 
 
 ifeq ($(DEBUG), 1)
@@ -227,6 +228,7 @@ $(BUILD_DIR)/stm32l5xx_ll_gpio.ll \
 $(BUILD_DIR)/stm32l5xx_ll_dma.ll \
 $(BUILD_DIR)/stm32l5xx_hal_pcd.ll \
 $(BUILD_DIR)/stm32l5xx_hal_pcd_ex.ll \
+$(BUILD_DIR)/testcase_without_pass.ll \
 $(BUILD_DIR)/io.ll \
 $(BUILD_DIR)/stm32l5xx_ll_usb.ll \
 $(BUILD_DIR)/system_stm32l5xx.ll \
@@ -235,10 +237,13 @@ $(BUILD_DIR)/main.ll
 TEST_CASE_DIR = Core/Src/testcases
 APPLICATION_BUILD_DIR = build/application
 APPLICATION_LL_FILE = $(BUILD_DIR)/application.ll 
+
+APPLICATION_C_SOURCES = $(wildcard $(TEST_CASE_DIR)/CWE121_Stack_Based_Buffer_Overflow/s09/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE122_Heap_Based_Buffer_Overflow/s09/*.c) \
+						Core/Src/application.c 
+
 APPLICATION_LL_FILES = $(addprefix $(APPLICATION_BUILD_DIR)/, $(notdir $(APPLICATION_C_SOURCES:.c=.ll)))
-APPLICATION_C_SOURCES = Core/Src/application.c \
-						$(wildcard $(TEST_CASE_DIR)/CWE121_Stack_Based_Buffer_Overflow/s09/*.c)
-APPLICATION_FLAGS = -Dmalloc=my_malloc -Dfree=my_free -Dmemcpy=my_memcpy -Dmemset=my_memset
+APPLICATION_FLAGS = -Dmalloc=my_malloc -Dfree=my_free -Dmemcpy=my_memcpy -Dmemset=my_memset -Dstrcpy=my_strcpy 
 # default action: build all
 all: $(LL_FILE) $(APPLICATION_LL_FILE)
 direct: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin
@@ -255,8 +260,10 @@ OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(ASM_SOURCES:.s=.o)))
 vpath %.s $(sort $(dir $(ASM_SOURCES)))
 
 # list of application
+$(info APPLICATION_C_SOURCES: $(APPLICATION_C_SOURCES) APPLICATION_LL_FILES $(APPLICATION_LL_FILES))
 APPLICATION_OBJECTS  = $(addprefix $(APPLICATION_BUILD_DIR)/,$(notdir $(APPLICATION_C_SOURCES:.c=.o)))
 vpath %.c $(sort $(dir $(APPLICATION_C_SOURCES)))
+$(info APPLICATION_OBJECTS: $(APPLICATION_OBJECTS))
 
 
 
@@ -268,7 +275,7 @@ $(BUILD_DIR)/%.ll: %.c Makefile | $(BUILD_DIR)
 	$(LLVM_CC) $(LLVM_FLAGS) -emit-llvm -c $< -o $@
 
 $(APPLICATION_BUILD_DIR)/%.ll: %.c Makefile | $(APPLICATION_BUILD_DIR) 
-	$(LLVM_CC) $(LLVM_FLAGS) -emit-llvm -Dmalloc=my_malloc -Dfree=my_free -c $< -o $@
+	$(LLVM_CC) $(LLVM_FLAGS) -emit-llvm $(APPLICATION_FLAGS) -c $< -o $@
 
 # 모든 .ll 파일을 링크하여 output.ll 생성
 $(LL_FILE): $(LL_FILES)

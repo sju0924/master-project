@@ -1287,3 +1287,26 @@ void sd_card_write(const char *message) {
         uart_send_string("SD card initialization failed.\n");
     }
 }
+
+void StartTimer(void) {
+  
+  HAL_TIM_Base_Start(&htim4);  // TIM4 시작
+   __HAL_DBGMCU_FREEZE_TIM4();
+}
+
+uint32_t GetTimerCounter(void) {
+    return __HAL_TIM_GET_COUNTER(&htim4);  // TIM4 현재 카운터 값 읽기
+}
+
+float CalculateTimerResolution(void) {
+    uint32_t timer_clock = 0;
+    float resolution = 0;
+
+    // APB1 타이머 입력 클럭 확인
+    timer_clock = HAL_RCC_GetPCLK1Freq();  // TIM4는 APB1 클럭을 사용
+
+    // 타이머 해상도 계산
+    resolution = (float)(htim4.Init.Prescaler + 1) / (float)timer_clock;
+
+    return resolution;
+}

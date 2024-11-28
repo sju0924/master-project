@@ -45,17 +45,15 @@ static void goodG2B()
 {
     
     char data[48]__attribute__((aligned(8)));
-    char dest[50] __attribute__((aligned(8)));
-    char buffer[16] __attribute__((aligned(8))) = "AAAAAAAAAAAAAAAA";
+    char dest[48] __attribute__((aligned(8)));
     /* FIX: Initialize data as a small buffer that as small or smaller than the small buffer used in the sink */
-    memset(data, 'A', 50); /* fill with 'A's */
+    memset(data, 'A', 48); /* fill with 'A's */
     data[48-1] = '\0'; /* null terminate */
     
         
         /* POTENTIAL FLAW: Possible buffer overflow if data is larger than dest */
         strcpy(dest, data);
         printLine(dest);
-        printLine(buffer);
     
 }
 

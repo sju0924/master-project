@@ -35,6 +35,17 @@ void* my_memcpy(void* dest, const void* src, size_t num) {
     return memcpy(dest, src, num);
 }
 
+char* my_strcpy(char* dest, const char* origin){
+    size_t len = 0;
+    char *ptr = origin;
+    while(*ptr++ != '\0'){
+        len++;
+    }
+
+    compare_tag(dest, dest+len);
+    return strcpy(dest, origin);
+}
+
 // 커스텀 my_memmove 함수
 void* my_memmove(void* dest, const void* src, size_t num) {
     // 시작 포인터와 끝 포인터 계산
