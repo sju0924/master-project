@@ -42,10 +42,14 @@ void application(){
   elapsed_ticks = end_tick - start_tick;
 
   // Pass 적용 시간 출력
-  sprintf(log_buffer, "Execution Time With Pass: %u ms, start tick: %u, end tick: %u\r\n", elapsed_ticks, start_tick, end_tick);
+  sprintf(log_buffer, "Execution Time Without Pass: %u ms, \r\n", elapsed_ticks);
+  uart_send_string(log_buffer);
+    sprintf(log_buffer, "start tick: %u, end tick: %u\r\n",  start_tick, end_tick);
   uart_send_string(log_buffer);
 
 
+  // 보호x인 테스트케이스 위해 MPU 해제
+  HAL_MPU_Disable();
   // Pass 적용 전 시간 측정
   start_tick = HAL_GetTick();
 
@@ -60,11 +64,16 @@ void application(){
   elapsed_ticks = end_tick - start_tick;
 
   // Pass 적용 전 출력
-  sprintf(log_buffer, "Execution Time With Pass: %u ms, start tick: %u, end tick: %u\r\n", elapsed_ticks, start_tick, end_tick);
+  sprintf(log_buffer, "Execution Time Without Pass: %u ms, \r\n", elapsed_ticks);
+  uart_send_string(log_buffer);
+    sprintf(log_buffer, "start tick: %u, end tick: %u\r\n",  start_tick, end_tick);
   uart_send_string(log_buffer);
 
   const char* msg1 = "Good passed\r\n";
   uart_send_string(msg1);
+
+  // bad testcase를 위한 보호 설정
+  HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
   //CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_bad();
   CWE122_Heap_Based_Buffer_Overflow__c_CWE805_wchar_t_memmove_01_bad();
 }

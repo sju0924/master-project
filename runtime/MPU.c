@@ -140,27 +140,6 @@
 #include "runtimeConfig.h"
 
 
-/**
-  * @}
-  */
-
-typedef struct
-{
-  uint8_t                Enable;                /*!< Specifies the status of the region. 
-                                                     This parameter can be a value of @ref CORTEX_MPU_Region_Enable                 */
-  uint8_t                Number;                /*!< Specifies the number of the region to protect. 
-                                                     This parameter can be a value of @ref CORTEX_MPU_Region_Number                 */
-  uint32_t               BaseAddress;           /*!< Specifies the base address of the region to protect.                           */
-  uint32_t               LimitAddress;          /*!< Specifies the limit address of the region to protect.                          */
-  uint8_t                AttributesIndex;       /*!< Specifies the memory attributes index.
-                                                     This parameter can be a value of @ref CORTEX_MPU_Attributes_Number             */
-  uint8_t                AccessPermission;      /*!< Specifies the region access permission type. 
-                                                     This parameter can be a value of @ref CORTEX_MPU_Region_Permission_Attributes  */
-  uint8_t                DisableExec;           /*!< Specifies the instruction access status. 
-                                                     This parameter can be a value of @ref CORTEX_MPU_Instruction_Access            */
-  uint8_t                IsShareable;           /*!< Specifies the shareability status of the protected region. 
-                                                     This parameter can be a value of @ref CORTEX_MPU_Access_Shareable              */
-} MPU_Region_InitTypeDef;
 
 
 void HAL_MPU_Enable(uint32_t MPU_Control);
