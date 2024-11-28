@@ -69,7 +69,8 @@ PreservedAnalyses StackMPUPass::run(Function &F,
         for (auto I = BB.begin(); I != BB.end(); ++I) {
             // CallInst를 통해 함수 호출 감지
             if (CallInst *CI = dyn_cast<CallInst>(&*I)) {
-                if (Function *calledFunc = CI->getCalledFunction()) {
+                Function *calledFunc = CI->getCalledFunction();
+                if (calledFunc) {
                     if (calledFunc->getName() == "configure_mpu_redzone_for_call" ||
                         calledFunc->getName() == "configure_mpu_redzone_for_return" ||
                         (calledFunc->getName().find("llvm.") == 0 && calledFunc->getName().find("mem") == std::string::npos) ) {
@@ -90,6 +91,8 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                         errs() << "  Indirect function call detected\n";
                     }
                 }  
+
+                
                 
                 // 함수 호출 전: "sub rsp, 64" 삽입
                 IRBuilder<> BuilderBefore(CI);
@@ -100,7 +103,7 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                 ++I; // Move iterator to the next instruction
                 if (I != BB.end()) { // Check if iterator is still valid
                     IRBuilder<> BuilderAfter(&*I); 
-                    if (F.getName() != "configure_mpu_redzone_for_heap_access" && F.getName() != "configure_mpu_redzone_for_global" && F.getName() != "configure_mpu_for_poison"&& F.getName() != "set_tag"){
+                    if (calledFunc && calledFunc->getName() != "configure_mpu_redzone_for_heap_access" && calledFunc->getName()!= "configure_mpu_redzone_for_global" &&calledFunc->getName() != "configure_mpu_for_poison"&&calledFunc->getName()!= "set_tag" &&  calledFunc->getName() != "HAL_MPU_Disable"&&  calledFunc->getName() != "HAL_MPU_Enable"&&  calledFunc->getName() != "HAL_GetTick"  ){
                         BuilderAfter.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});   
                     }                         
                     
@@ -108,7 +111,7 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                 }
                 else{
                     IRBuilder<> BuilderRedzone(CI->getNextNode());                    
-                    if (F.getName() != "configure_mpu_redzone_for_heap_access" && F.getName() != "configure_mpu_redzone_for_global" && F.getName() != "configure_mpu_for_poison"&& F.getName() != "set_tag"){
+                    if (calledFunc && calledFunc->getName() != "configure_mpu_redzone_for_heap_access" && calledFunc->getName() != "configure_mpu_redzone_for_global" && calledFunc->getName() != "configure_mpu_for_poison"&&calledFunc->getName() != "set_tag"&&  calledFunc->getName() != "HAL_MPU_Disable"&&  calledFunc->getName() != "HAL_MPU_Enable"&&  calledFunc->getName() != "HAL_GetTick" ){
                         BuilderRedzone.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});   
                     }
                     BuilderRedzone.CreateCall(AddRSP);         

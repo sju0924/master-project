@@ -34,13 +34,15 @@ def move_app_blocks(input_file, output_file):
         if "sub" in app_block[1]:
             for i in range(block_start, len(lines)):
                 if "bl	" in lines[i]:  # bl 명령어 발견
-                    print("insert line sub", i, ", inst ",lines[i])
+                    if "configure_mpu_redzone_for_call" not in lines[i]:
+                        print("insert line sub", i, ", inst ",lines[i],end="")
                     lines = lines[:i] + app_block + lines[i:]  # bl 명령어 바로 위에 삽입
                     break
         else:
             for i in range(block_start, 0, -1):
                 if "bl	" in lines[i]:  # bl 명령어 발견
-                    print("insert line add", i, ", inst ",lines[i])
+                    if "configure_mpu_redzone_for_call" not in lines[i]:
+                        print("insert line add", i, ", inst ",lines[i],end="")
                     lines = lines[:i+1] + app_block + lines[i+1:]  # bl 명령어 바로 위에 삽입
                     break
             
