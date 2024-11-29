@@ -18,12 +18,10 @@ Template File: sources-sink-01.tmpl.cpp
 
 #include <wchar.h>
 
-namespace CWE124_Buffer_Underwrite__new_char_cpy_01
-{
 
 #ifndef OMITBAD
 
-void bad()
+void CWE124_Buffer_Underwrite__new_char_cpy_01_bad()
 {
     char * data;
     data = NULL;
@@ -74,14 +72,14 @@ static void goodG2B()
     }
 }
 
-void good()
+void CWE124_Buffer_Underwrite__new_char_cpy_01_good()
 {
     goodG2B();
 }
 
 #endif /* OMITGOOD */
 
-} /* close namespace */
+ /* close namespace */
 
 /* Below is the main(). It is only used when building this testcase on
    its own for testing or for building a binary to use in testing binary
@@ -90,7 +88,7 @@ void good()
 
 #ifdef INCLUDEMAIN
 
-using namespace CWE124_Buffer_Underwrite__new_char_cpy_01; /* so that we can use good and bad easily */
+/* so that we can use good and bad easily */
 
 int main(int argc, char * argv[])
 {
