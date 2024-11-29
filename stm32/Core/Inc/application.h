@@ -1,5 +1,5 @@
 // #include "test_cases_CWE121_Stack_Based_Buffer_Overflow.h"
-#include "CWE122_Heap_Based_Buffer_Overflow__c_CWE805_wchar_t_memmove_01.h"
+#include "testcase.h"
 #include "main.h"
 
 void test_uart_print();
