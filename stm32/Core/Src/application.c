@@ -33,7 +33,7 @@ void application(){
 
   for(int i = 0 ; i<100 ; i++){
     //CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good();
-    CWE124_Buffer_Underwrite__CWE839_negative_01_good();
+    CWE124_Buffer_Underwrite__new_char_cpy_01_good();
   }
   
   end_tick = HAL_GetTick();
@@ -55,7 +55,7 @@ void application(){
 
   for(int i = 0 ; i<100 ; i++){
     //CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good_without_pass();
-    CWE124_Buffer_Underwrite__CWE839_negative_01_good_without_pass();
+    CWE124_Buffer_Underwrite__new_char_cpy_01_good_without_pass();
   }
   
   end_tick = HAL_GetTick();
@@ -75,7 +75,7 @@ void application(){
   // bad testcase를 위한 보호 설정
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
   //CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_bad();
-  CWE124_Buffer_Underwrite__CWE839_negative_01_bad();
+  CWE124_Buffer_Underwrite__new_char_cpy_01_bad();
 }
 void test_struct_tagging(){
   char not_struct[11]={'N','O','T',' ','S','T','R','U','C','T','\n'};
