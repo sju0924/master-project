@@ -135,7 +135,11 @@ PreservedAnalyses StackMPUPass::run(Function &F,
 
             // 함수 리턴 후 
             RetBuilder.SetInsertPoint(Ret);  // Ret 위치에 삽입 지점 설정
+            RetBuilder.CreateCall(SubRSP);
             RetBuilder.CreateCall(configureMPURedzoneForReturn);
+            RetBuilder.CreateCall(AddRSP);
+
+ 
             errs() << "  Return detected in function: " 
                     << F.getName() << "\n";
         }
