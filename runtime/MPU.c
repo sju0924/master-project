@@ -207,34 +207,34 @@ void configure_mpu_redzone_for_return() {
     HAL_MPU_Disable();
 
     uint32_t sp, r7;
-    __asm__ volatile("mov %0, sp" : "=r"(sp));  // 현재 SP 가져오기
-    __asm__ volatile("mov %0, r7" : "=r"(r7));  // 현재 SP 가져오기
+    // __asm__ volatile("mov %0, sp" : "=r"(sp));  // 현재 SP 가져오기
+    // __asm__ volatile("mov %0, r7" : "=r"(r7));  // 현재 SP 가져오기
 
-    sp = sp & ~(uintptr_t)(ALIGNMENT - 1);
-    r7 = (r7 + ALIGNMENT - 1) & ~(uintptr_t)(ALIGNMENT - 1);
+    // sp = sp & ~(uintptr_t)(ALIGNMENT - 1);
+    // r7 = (r7 + ALIGNMENT - 1) & ~(uintptr_t)(ALIGNMENT - 1);
 
-    // Red Zone의 앞뒤 주소 계산
-    uint32_t front_addr = sp; // Redzone 0이 시작되는 주소
-    uint32_t back_addr = r7; // Redzone 1이 시작하는 주소
+    // // Red Zone의 앞뒤 주소 계산
+    // uint32_t front_addr = sp; // Redzone 0이 시작되는 주소
+    // uint32_t back_addr = r7; // Redzone 1이 시작하는 주소
 
-    // 디버그
-    #ifdef DEBUG
-    char buffer[100];
-    snprintf(buffer, sizeof(buffer), "Unset Stack Pointer and R7 values:  SP: %x, R7: %x", sp, r7);
-    uart_debug_print(buffer);
-    #endif
+    // // 디버그
+    // #ifdef DEBUG
+    // char buffer[100];
+    // snprintf(buffer, sizeof(buffer), "Unset Stack Pointer and R7 values:  SP: %x, R7: %x", sp, r7);
+    // uart_debug_print(buffer);
+    // #endif
 
 
-    // Red Zone 앞부분 설정 (MPU 영역 0)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER0, MPU_REGION_DISABLE, front_addr - REDZONE_SIZE/2, REDZONE_SIZE/2, MPU_REGION_ALL_RO);  // Red Zone 앞쪽 설정  
+    // // Red Zone 앞부분 설정 (MPU 영역 0)
+    // MPU_ConfigureRegion(MPU_REGION_NUMBER0, MPU_REGION_DISABLE, front_addr - REDZONE_SIZE/2, REDZONE_SIZE/2, MPU_REGION_ALL_RO);  // Red Zone 앞쪽 설정  
 
-    // Red Zone 뒷부분 설정 (MPU 영역 1)
-    MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_DISABLE, back_addr, REDZONE_SIZE/2, MPU_REGION_ALL_RO); // Red Zone 뒤쪽 설정
+    // // Red Zone 뒷부분 설정 (MPU 영역 1)
+    // MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_DISABLE, back_addr, REDZONE_SIZE/2, MPU_REGION_ALL_RO); // Red Zone 뒤쪽 설정
 
-    HAL_MPU_EnableRegion(MPU_REGION_NUMBER0);
-    HAL_MPU_EnableRegion(MPU_REGION_NUMBER1);
+    // HAL_MPU_EnableRegion(MPU_REGION_NUMBER0);
+    // HAL_MPU_EnableRegion(MPU_REGION_NUMBER1);
   
-    HAL_MPU_Enable(MPU_HFNMI_PRIVDEF);
+    // HAL_MPU_Enable(MPU_HFNMI_PRIVDEF);
 }
 
 void configure_mpu_redzone_for_heap_access(void* ptr){

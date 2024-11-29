@@ -240,6 +240,8 @@ APPLICATION_LL_FILE = $(BUILD_DIR)/application.ll
 
 APPLICATION_C_SOURCES = $(wildcard $(TEST_CASE_DIR)/CWE121_Stack_Based_Buffer_Overflow/s09/*.c) \
 						$(wildcard $(TEST_CASE_DIR)/CWE122_Heap_Based_Buffer_Overflow/s09/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE416_Use_After_Free/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE415_Double_Free/s01/*.c) \
 						Core/Src/application.c 
 
 APPLICATION_LL_FILES = $(addprefix $(APPLICATION_BUILD_DIR)/, $(notdir $(APPLICATION_C_SOURCES:.c=.ll)))
