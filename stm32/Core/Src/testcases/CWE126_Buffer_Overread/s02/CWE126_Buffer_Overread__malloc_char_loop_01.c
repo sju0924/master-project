@@ -53,7 +53,7 @@ void CWE126_Buffer_Overread__malloc_char_loop_01_bad()
 static void goodG2B()
 {
     if (data_good == NULL) {exit(-1);}
-    memset(data, 'A', 100-1); /* fill with 'A's */
+    memset(data_good, 'A', 100-1); /* fill with 'A's */
     data_good[100-1] = '\0'; /* null terminate */
     {
         size_t i, destLen;
