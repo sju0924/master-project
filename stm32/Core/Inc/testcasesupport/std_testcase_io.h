@@ -10,7 +10,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+void uart_send_string_char(char *str, size_t size) ;
 void printLine(const char * line);
 
 void printWLine(const wchar_t * line);

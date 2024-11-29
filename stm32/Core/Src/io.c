@@ -10,10 +10,16 @@
 
 void printLine (const char * line)
 {
-    if(line != NULL) 
+    if (line == NULL) return;
+    char *ptr = line;
+    size_t len = 0;
+    while (*ptr++ != '\0') 
     {
-        printf("%s\n", line);
+        len++;
     }
+    
+
+    // uart_send_string_char(line, len) ;
 }
 
 void printWLine (const wchar_t * line)
