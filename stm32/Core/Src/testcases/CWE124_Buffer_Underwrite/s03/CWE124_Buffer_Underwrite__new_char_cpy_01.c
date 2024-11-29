@@ -23,7 +23,7 @@ Template File: sources-sink-01.tmpl.cpp
 
 void CWE124_Buffer_Underwrite__new_char_cpy_01_bad()
 {
-    char * data;
+    volatile char * data;
     data = NULL;
     {
         char * dataBuffer = malloc(100*sizeof(char));

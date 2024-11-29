@@ -21,7 +21,7 @@ Template File: sources-sinks-01.tmpl.c
 
 void CWE124_Buffer_Underwrite__CWE839_negative_01_bad()
 {
-    int data;
+    volatile int data;
     /* Initialize data */
     data = -1;
     /* POTENTIAL FLAW: Use an invalid index */
