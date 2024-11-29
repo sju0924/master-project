@@ -22,22 +22,22 @@ Template File: sources-sink-01.tmpl.c
 
 char dataBuffer[100];
 
-void CWE124_Buffer_Underwrite__wchar_t_alloca_memcpy_01_bad()
+void CWE124_Buffer_Underwrite__char_alloca_memcpy_01_bad()
 {
-    wchar_t * data;
-    wmemset(dataBuffer, L'A', 100-1);
-    dataBuffer[100-1] = L'\0';
+    char * data;
+    memset(dataBuffer, 'A', 100-1);
+    dataBuffer[100-1] = '\0';
     /* FLAW: Set data pointer to before the allocated memory buffer */
     data = dataBuffer - 8;
     {
-        wchar_t source[100];
-        wmemset(source, L'C', 100-1); /* fill with 'C's */
-        source[100-1] = L'\0'; /* null terminate */
+        char source[100];
+        memset(source, 'C', 100-1); /* fill with 'C's */
+        source[100-1] = '\0'; /* null terminate */
         /* POTENTIAL FLAW: Possibly copying data to memory before the destination buffer */
-        memcpy(data, source, 100*sizeof(wchar_t));
+        memcpy(data, source, 100*sizeof(char));
         /* Ensure the destination buffer is null terminated */
-        data[100-1] = L'\0';
-        printWLine(data);
+        data[100-1] = '\0';
+        printLine(data);
     }
 }
 
@@ -48,24 +48,24 @@ void CWE124_Buffer_Underwrite__wchar_t_alloca_memcpy_01_bad()
 /* goodG2B uses the GoodSource with the BadSink */
 static void goodG2B()
 {
-    wchar_t * data;
-    wmemset(dataBuffer, L'A', 100-1);
-    dataBuffer[100-1] = L'\0';
+    char * data;
+    memset(dataBuffer, 'A', 100-1);
+    dataBuffer[100-1] = '\0';
     /* FIX: Set data pointer to the allocated memory buffer */
     data = dataBuffer;
     {
         wchar_t source[100];
-        wmemset(source, L'C', 100-1); /* fill with 'C's */
-        source[100-1] = L'\0'; /* null terminate */
+        wmemset(source, 'C', 100-1); /* fill with 'C's */
+        source[100-1] = '\0'; /* null terminate */
         /* POTENTIAL FLAW: Possibly copying data to memory before the destination buffer */
-        memcpy(data, source, 100*sizeof(wchar_t));
+        memcpy(data, source, 100*sizeof(char));
         /* Ensure the destination buffer is null terminated */
-        data[100-1] = L'\0';
-        printWLine(data);
+        data[100-1] = '\0';
+        printLine(data);
     }
 }
 
-void CWE124_Buffer_Underwrite__wchar_t_alloca_memcpy_01_good()
+void CWE124_Buffer_Underwrite__char_alloca_memcpy_01_good()
 {
     goodG2B();
 }

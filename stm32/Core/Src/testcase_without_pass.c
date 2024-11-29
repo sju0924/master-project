@@ -5,6 +5,7 @@
 
 void printLine(const char * line);
 char dataBuffer[100];
+char data_good[100];
 
 void CWE121_goodG2B_s09_01_without_pass() 
 {
@@ -254,23 +255,23 @@ void CWE124_Buffer_Underwrite__new_char_cpy_01_good_without_pass()
 /* goodG2B uses the GoodSource with the BadSink */
 static void CWE124_s04_01_goodG2B()
 {
-    wchar_t * data;
+    char * data;
     dataBuffer[100-1] = L'\0';
     /* FIX: Set data pointer to the allocated memory buffer */
     data = dataBuffer;
     {
-        wchar_t source[100];
-        wmemset(source, L'C', 100-1); /* fill with 'C's */
-        source[100-1] = L'\0'; /* null terminate */
+        char source[100];
+        memset(source, 'C', 100-1); /* fill with 'C's */
+        source[100-1] = '\0'; /* null terminate */
         /* POTENTIAL FLAW: Possibly copying data to memory before the destination buffer */
-        memcpy(data, source, 100*sizeof(wchar_t));
+        memcpy(data, source, 100*sizeof(char));
         /* Ensure the destination buffer is null terminated */
-        data[100-1] = L'\0';
-        printWLine(data);
+        data[100-1] = '\0';
+        printLine(data);
     }
 }
 
-void CWE124_Buffer_Underwrite__wchar_t_alloca_memcpy_01_good_without_pass()
+void CWE124_Buffer_Underwrite__char_alloca_memcpy_01_good_without_pass()
 {
     CWE124_s04_01_goodG2B();
 }
@@ -279,7 +280,7 @@ void CWE124_Buffer_Underwrite__wchar_t_alloca_memcpy_01_good_without_pass()
 static void CWE126_s02_01_goodG2B()
 {
     if (data_good == NULL) {exit(-1);}
-    memset(data, 'A', 100-1); /* fill with 'A's */
+    memset(data_good, 'A', 100-1); /* fill with 'A's */
     data_good[100-1] = '\0'; /* null terminate */
     {
         size_t i, destLen;

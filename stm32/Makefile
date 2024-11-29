@@ -242,6 +242,8 @@ APPLICATION_C_SOURCES = $(wildcard $(TEST_CASE_DIR)/CWE121_Stack_Based_Buffer_Ov
 						$(wildcard $(TEST_CASE_DIR)/CWE122_Heap_Based_Buffer_Overflow/s09/*.c) \
 						$(wildcard $(TEST_CASE_DIR)/CWE124_Buffer_Underwrite/s02/*.c) \
 						$(wildcard $(TEST_CASE_DIR)/CWE124_Buffer_Underwrite/s03/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE124_Buffer_Underwrite/s04/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE126_Buffer_Overread/s02/*.c) \
 						$(wildcard $(TEST_CASE_DIR)/CWE416_Use_After_Free/*.c) \
 						$(wildcard $(TEST_CASE_DIR)/CWE415_Double_Free/s01/*.c) \
 						$(wildcard $(TEST_CASE_DIR)/CWE476_NULL_Pointer_Dereference/*.c) \

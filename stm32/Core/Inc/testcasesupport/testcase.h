@@ -14,8 +14,8 @@ void CWE124_Buffer_Underwrite__CWE839_negative_01_good();
 void CWE124_Buffer_Underwrite__new_char_cpy_01_bad();
 void CWE124_Buffer_Underwrite__new_char_cpy_01_good();
 
-void CWE124_Buffer_Underwrite__wchar_t_alloca_memcpy_01_bad();
-void CWE124_Buffer_Underwrite__wchar_t_alloca_memcpy_01_good();
+void CWE124_Buffer_Underwrite__char_alloca_memcpy_01_bad();
+void CWE124_Buffer_Underwrite__char_alloca_memcpy_01_good();
 
 void CWE126_Buffer_Overread__malloc_char_loop_01_bad();
 void CWE126_Buffer_Overread__malloc_char_loop_01_good();

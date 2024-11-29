@@ -9,5 +9,5 @@ void CWE415_Double_Free__malloc_free_char_01_good_without_pass();
 void CWE476_NULL_Pointer_Dereference__char_01_good_without_pass();
 
 
-void CWE124_Buffer_Underwrite__wchar_t_alloca_memcpy_01_good_without_pass();
+void CWE124_Buffer_Underwrite__char_alloca_memcpy_01_good_without_pass();
 void CWE126_Buffer_Overread__malloc_char_loop_01_good_without_pass();
