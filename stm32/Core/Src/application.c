@@ -33,7 +33,7 @@ void application(){
 
   for(int i = 0 ; i<100 ; i++){
     //CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good();
-    CWE415_Double_Free__malloc_free_char_01_good();
+    CWE476_NULL_Pointer_Dereference__char_01_good();
   }
   
   end_tick = HAL_GetTick();
@@ -55,7 +55,7 @@ void application(){
 
   for(int i = 0 ; i<100 ; i++){
     //CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good_without_pass();
-    CWE415_Double_Free__malloc_free_char_01_good_without_pass();
+    CWE476_NULL_Pointer_Dereference__char_01_good_without_pass();
   }
   
   end_tick = HAL_GetTick();
@@ -64,7 +64,7 @@ void application(){
   elapsed_ticks = end_tick - start_tick;
 
   // Pass 적용 전 출력
-  sprintf(log_buffer, "Execution Time Without Pass: %u ms, \r\n", elapsed_ticks);
+  sprintf(log_buffer, "Execution Time With Pass: %u ms, \r\n", elapsed_ticks);
   uart_send_string(log_buffer);
     sprintf(log_buffer, "start tick: %u, end tick: %u\r\n",  start_tick, end_tick);
   uart_send_string(log_buffer);
@@ -75,7 +75,7 @@ void application(){
   // bad testcase를 위한 보호 설정
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
   //CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_bad();
-  CWE415_Double_Free__malloc_free_char_01_bad();
+  CWE476_NULL_Pointer_Dereference__char_01_bad();
 }
 void test_struct_tagging(){
   char not_struct[11]={'N','O','T',' ','S','T','R','U','C','T','\n'};

@@ -23,11 +23,12 @@ Template File: sources-sinks-01.tmpl.c
 
 void CWE476_NULL_Pointer_Dereference__char_01_bad()
 {
-    char * data;
+    volatile char * data;
     /* POTENTIAL FLAW: Set data to NULL */
     data = NULL;
     /* POTENTIAL FLAW: Attempt to use data, which may be NULL */
     /* printLine() checks for NULL, so we cannot use it here */
+    data[0] = 'A';
     printHexCharLine(data[0]);
 }
 
@@ -55,6 +56,7 @@ static void goodB2G()
     /* FIX: Check for NULL before attempting to print data */
     if (data != NULL)
     {
+        data[0] = 'A';
         /* printLine() checks for NULL, so we cannot use it here */
         printHexCharLine(data[0]);
     }

@@ -1,4 +1,9 @@
 void CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good_without_pass();
 void CWE122_Heap_Based_Buffer_Overflow__c_CWE805_wchar_t_memmove_01_good_without_pass();
+
+void CWE124_Buffer_Underwrite__CWE839_negative_01_good_without_pass();
+void CWE124_Buffer_Underwrite__new_char_cpy_01_good_without_pass();
+
 void CWE416_Use_After_Free__malloc_free_char_01_good_without_pass();
 void CWE415_Double_Free__malloc_free_char_01_good_without_pass();
+void CWE476_NULL_Pointer_Dereference__char_01_good_without_pass();
