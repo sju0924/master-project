@@ -132,11 +132,11 @@ void MemManage_Handler(void) {
     uint32_t *stack_ptr;
     
 
-    // PC와 LR 레지스터 값 읽기
-    asm volatile ("mov %0, sp" : "=r" (stack_ptr));  // SP 값 얻기
+    // // PC와 LR 레지스터 값 읽기
+    // asm volatile ("mov %0, sp" : "=r" (stack_ptr));  // SP 값 얻기
 
-    info.lr = stack_ptr[5];  // Link Register
-    info.pc = stack_ptr[6];  // Program Counter
+    // info.lr = stack_ptr[5];  // Link Register
+    // info.pc = stack_ptr[6];  // Program Counter
     // CFSR 및 MMFAR 레지스터 값 읽기
     info.cfsr = *((volatile uint32_t*)0xE000ED28);   // Configurable Fault Status Register
     info.fault_address = *((volatile uint32_t*)0xE000ED34);  // Memory Management Fault Address Register

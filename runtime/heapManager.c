@@ -46,13 +46,13 @@ void* my_malloc(size_t size) {
         HAL_MPU_EnableRegion(MPU_REGION_NUMBER3);
     }
 
-    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+   
 
     // 메타데이터 설정
     HeapMetadata* metadata = (HeapMetadata*)((aligned_ptr - REDZONE_SIZE/2 - sizeof(HeapMetadata)) & ~(4 - 1));
     metadata->size = size;
     metadata->raw_ptr = (void*)raw_ptr;  // 메모리 해제 시 사용할 실제 시작 주소 저장
-
+    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
     // 태그 설정
     // 우선 전체 할당 범위에만 태그 부여
     set_tag((void*)aligned_ptr, size);
@@ -117,7 +117,10 @@ void my_free(void* ptr) {
     // 태그 삭제
     
     remove_tag((void*)start_address,end_address-start_address);
-    
+
+    //double-free 확인
+    char *check_poison = (char *)start_address ;
+    *check_poison = '\0';
 
     // Free된 영역에 대한 MPU 보호 설정
     configure_mpu_for_poison((void *)(start_address), metadata->size);
