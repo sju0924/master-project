@@ -103,7 +103,7 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                 ++I; // Move iterator to the next instruction
                 if (I != BB.end()) { // Check if iterator is still valid
                     IRBuilder<> BuilderAfter(&*I); 
-                    if (calledFunc && calledFunc->getName() != "configure_mpu_redzone_for_heap_access" && calledFunc->getName()!= "configure_mpu_redzone_for_global" &&calledFunc->getName() != "configure_mpu_for_poison"&&calledFunc->getName()!= "set_tag" &&  calledFunc->getName() != "HAL_MPU_Disable"&&  calledFunc->getName() != "HAL_MPU_Enable"&&  calledFunc->getName() != "HAL_GetTick"  ){
+                    if (calledFunc && calledFunc->getName() != "configure_mpu_redzone_for_heap_access" && calledFunc->getName()!= "configure_mpu_redzone_for_global" &&calledFunc->getName() != "configure_mpu_for_poison"&&calledFunc->getName()!= "set_tag"&&calledFunc->getName() != "compare_tag" &&  calledFunc->getName() != "HAL_MPU_Disable"&&  calledFunc->getName() != "HAL_MPU_Enable"&&  calledFunc->getName() != "HAL_GetTick"  ){
                         BuilderAfter.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});   
                     }                         
                     
@@ -111,7 +111,7 @@ PreservedAnalyses StackMPUPass::run(Function &F,
                 }
                 else{
                     IRBuilder<> BuilderRedzone(CI->getNextNode());                    
-                    if (calledFunc && calledFunc->getName() != "configure_mpu_redzone_for_heap_access" && calledFunc->getName() != "configure_mpu_redzone_for_global" && calledFunc->getName() != "configure_mpu_for_poison"&&calledFunc->getName() != "set_tag"&&  calledFunc->getName() != "HAL_MPU_Disable"&&  calledFunc->getName() != "HAL_MPU_Enable"&&  calledFunc->getName() != "HAL_GetTick" ){
+                    if (calledFunc && calledFunc->getName() != "configure_mpu_redzone_for_heap_access" && calledFunc->getName() != "configure_mpu_redzone_for_global" && calledFunc->getName() != "configure_mpu_for_poison"&&calledFunc->getName() != "set_tag"&&calledFunc->getName() != "compare_tag"&&  calledFunc->getName() != "HAL_MPU_Disable"&&  calledFunc->getName() != "HAL_MPU_Enable"&&  calledFunc->getName() != "HAL_GetTick" ){
                         BuilderRedzone.CreateCall(configureMPURedzoneForCall, {SpVal, R7Val});   
                     }
                     BuilderRedzone.CreateCall(AddRSP);         

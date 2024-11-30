@@ -203,36 +203,83 @@ PreservedAnalyses PointerArithmeticPass::run(Function &F, FunctionAnalysisManage
         // 현재 블록이 반복문에 포함되어 있는지 확인
         Loop *L = LI.getLoopFor(&BB);
         
-        if (L) {
-            // 반복문 내에서 첫 번째 및 마지막 접근 요소를 추적
-            Value *firstAccess = nullptr;
-            Value *lastAccess = nullptr;
+if (L) {
+    // 반복문 내에서 첫 번째 및 마지막 접근 요소를 추적
+    std::map<Value *, std::pair<GetElementPtrInst *, GetElementPtrInst *>> AccessMap; // 포인터 -> (첫 번째 GEP, 마지막 GEP)
 
-            for (auto &I : BB) {
-                if (auto *GEP = dyn_cast<GetElementPtrInst>(&I)) {
-                    // 첫 번째 요소 접근 시 포인터 저장
-                    if (!firstAccess) {
-                        firstAccess = GEP;
-                        errs() << "First element in loop detected: " << *GEP << "\n";
+    // 반복문 종료 블록 찾기
+    SmallVector<BasicBlock *, 4> ExitBlocks;
+    L->getExitBlocks(ExitBlocks);
+
+    // 반복문 내에서 GEP 연산 추적
+    for (auto &I : BB) {
+        if (auto *GEP = dyn_cast<GetElementPtrInst>(&I)) {
+            Value *BasePointer = GEP->getPointerOperand(); // GEP의 기준 포인터
+
+            // AccessMap에서 해당 포인터를 검색
+            auto &AccessPair = AccessMap[BasePointer];
+            if (!AccessPair.first) {
+                AccessPair.first = GEP; // 첫 번째 접근
+                errs() << "First access for pointer " << *BasePointer << ": " << *GEP << "\n";
+            }
+            AccessPair.second = GEP; // 마지막 접근 (매번 갱신)
+        }
+    }
+
+    // 각 Exit 블록에 대해 처리
+    for (BasicBlock *ExitBlock : ExitBlocks) {
+        IRBuilder<> Builder(&(*ExitBlock->getFirstInsertionPt())); // ExitBlock의 시작 지점 설정
+
+        for (const auto &Entry : AccessMap) {
+            Value *BasePointer = Entry.first;
+            GetElementPtrInst *FirstAccess = Entry.second.first;
+            GetElementPtrInst *LastAccess = Entry.second.second;
+
+            if (FirstAccess && LastAccess) {
+                bool validForAllPredecessors = true; // 모든 선행 블록에서 정의된 값을 확인하기 위한 플래그
+
+                // 선행 블록 탐색
+                for (auto *Pred : predecessors(ExitBlock)) {
+                    Value *FirstGEP = nullptr;
+                    Value *LastGEP = nullptr;
+
+                    // 선행 블록 내의 명령어들을 순회하면서 GEP 명령어가 있는지 확인
+                    for (auto &I : *Pred) {
+                        if (auto *GEP = dyn_cast<GetElementPtrInst>(&I)) {
+                            if (GEP == FirstAccess) {
+                                FirstGEP = GEP;
+                            }
+                            if (GEP == LastAccess) {
+                                LastGEP = GEP;
+                            }
+                        }
                     }
-                    // 반복문 내 마지막 요소 접근을 계속 업데이트
-                    lastAccess = GEP;
+
+                    // GEP 명령어가 없는 경우, 해당 블록에 대해 compare_tag를 수행하지 않도록 설정
+                    if (!FirstGEP || !LastGEP) {
+                        validForAllPredecessors = false;
+                        errs() << "Skipping compare_tag for Exit block: " << ExitBlock->getName()
+                               << " due to missing GEP in predecessor: " << Pred->getName() << "\n";
+                        break;
+                    }
+                }
+
+                // 모든 선행 블록에서 GEP 명령어가 유효하게 정의된 경우에만 compare_tag 호출
+                if (validForAllPredecessors) {
+                    Value *FirstCast = Builder.CreateBitCast(FirstAccess, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
+                    Value *LastCast = Builder.CreateBitCast(LastAccess, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
+
+                    // compare_tag 호출
+                    Builder.CreateCall(CompareTagFunc, {FirstCast, LastCast});
+                    errs() << "compare_tag inserted for pointer: " << *BasePointer << " at block: " << ExitBlock->getName() << "\n";
                 }
             }
-        
-
-            // 반복문이 끝난 후 첫 번째와 마지막 요소에 대해 태그 비교 수행
-            if (firstAccess && lastAccess) {
-                Builder.SetInsertPoint(BB.getTerminator());  // 블록의 마지막에 삽입
-
-                // 첫 번째와 마지막 포인터를 i8*로 캐스팅하여 compare_tag 호출
-                auto *CastFirst = Builder.CreateBitCast(firstAccess, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
-                auto *CastLast = Builder.CreateBitCast(lastAccess, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
-                Builder.CreateCall(CompareTagFunc, {CastFirst, CastLast});
-                
-                Modified = true;
-            }
         }
+
+        Modified = true;
+    }
+}
+
         else {
             // 반복문 외부의 모든 GEP 감지
             for (auto &I : BB) {
