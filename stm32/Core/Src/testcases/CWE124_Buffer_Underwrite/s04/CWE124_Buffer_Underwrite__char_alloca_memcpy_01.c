@@ -54,8 +54,8 @@ static void goodG2B()
     /* FIX: Set data pointer to the allocated memory buffer */
     data = dataBuffer;
     {
-        wchar_t source[100];
-        wmemset(source, 'C', 100-1); /* fill with 'C's */
+        char source[100];
+        memset(source, 'C', 100-1); /* fill with 'C's */
         source[100-1] = '\0'; /* null terminate */
         /* POTENTIAL FLAW: Possibly copying data to memory before the destination buffer */
         memcpy(data, source, 100*sizeof(char));

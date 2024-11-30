@@ -292,7 +292,7 @@ static void CWE126_s02_01_goodG2B()
          * could be smaller than dest causing buffer overread */
         for (i = 0; i < destLen; i++)
         {
-            dest[i] = data_good[i];
+            data_good[i] = dest[i];
         }
         dest[100-1] = '\0';
         printLine(dest);
