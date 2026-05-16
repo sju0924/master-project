@@ -1,9 +1,13 @@
 #include "runtimeConfig.h"
+#include <setjmp.h>
 
 // UART 및 SD 카드 인터페이스 함수 선언
-
 void sd_card_write(const char *message);
-void MemManage_Handler(void);
+
+// Test-runner shared state (defined in test_runner.c, part of output.o)
+extern jmp_buf      g_test_recovery;
+extern volatile int g_test_running;
+extern volatile int g_error_detected;
 
 // 외부에 정의된 compare_tag 함수 선언
 uint8_t* get_tag_address(void *address);
@@ -100,16 +104,13 @@ void log_error(ErrorInfo* info) {
 void handle_tag_mismatch(void* start, void* end) {
     ErrorInfo info = {0};
     info.type = ERROR_TAG_MISMATCH;
-
-    info.pc = (uintptr_t)start;
-    info.lr = 0x00000000;
-
+    info.pc   = (uintptr_t)start;
+    info.lr   = 0x00000000;
 
     // 태그 불일치 발생 위치 탐색
     uint8_t* current = (uint8_t*)start;
-    uint8_t* last = (uint8_t*)end;
+    uint8_t* last    = (uint8_t*)end;
     while (current <= last) {
-
         if (!(*get_tag_address(start) == *get_tag_address(current))) {
             info.tag_mismatch_addr = current;
             break;
@@ -118,53 +119,18 @@ void handle_tag_mismatch(void* start, void* end) {
     }
 
     log_error(&info);
-    // 시스템 정지 (디버깅 목적)
-    while (1);
-}
 
-
-
-
-// MPU 접근 위반 예외 처리기 (Memory Management Fault Handler)
-void MemManage_Handler(void) {
-    char log_buffer[512];
-    ErrorInfo info = {0};
-    uint32_t *stack_ptr;
-    
-
-    // // PC와 LR 레지스터 값 읽기
-    // asm volatile ("mov %0, sp" : "=r" (stack_ptr));  // SP 값 얻기
-
-    // info.lr = stack_ptr[5];  // Link Register
-    // info.pc = stack_ptr[6];  // Program Counter
-    // CFSR 및 MMFAR 레지스터 값 읽기
-    info.cfsr = *((volatile uint32_t*)0xE000ED28);   // Configurable Fault Status Register
-    info.fault_address = *((volatile uint32_t*)0xE000ED34);  // Memory Management Fault Address Register
-
-    // 2. 접근 위반이 발생한 주소와 설정된 MPU 리전들의 범위를 비교
-    for (uint32_t region = 0; region < 8; region++) {
-        // MPU_RNR 레지스터에 리전 번호 설정
-        *((volatile uint32_t*)0xE000ED98) = region;
-
-        // MPU_RBAR 레지스터에서 리전의 Base Address 읽기
-        uint32_t base_address = *((volatile uint32_t*)0xE000ED9C) & 0xFFFFFFE0;  // 하위 5비트 제외
-
-        // MPU_RLAR 레지스터에서 리전의 Limit address 읽기
-        uint32_t limit_address = *((volatile uint32_t*)0xE000EDA0) & 0xFFFFFFE0;
-
-        snprintf(log_buffer, sizeof(log_buffer) ,
-                 "Region: %d, Base Address: %p, Limit Address: %p, Fault Address: %p\r\n", region, base_address, limit_address, info.fault_address);
-        uart_debug_print(log_buffer);
-        // fault_address가 해당 리전의 주소 범위에 있는지 확인
-        if (info.fault_address  >= base_address && info.fault_address  < limit_address + REDZONE_SIZE/2) {
-            info.type = (ErrorType)region;
-            info.mpu_region = region;
-            break;
-       }
+    // 테스트 러너 실행 중이면 예외 대신 복구 경로로 점프
+    if (g_test_running) {
+        g_error_detected = 1;
+        longjmp(g_test_recovery, 2);
     }
-    // 로그 작성 및 출력
-    log_error(&info);
 
-    // 시스템 정지 (디버깅 목적)
     while (1);
 }
+
+
+
+
+/* MemManage_Handler is defined in stm32l5xx_it.c (naked wrapper + C body).
+   This file previously had a duplicate stub – removed to avoid linker conflict. */

@@ -1,5 +1,19 @@
 #include "heapManager.h"
 
+/* ── allocation tracker ─────────────────────────────────────────────── */
+#define MAX_HEAP_ALLOCS 32
+
+static void *heap_track_raw[MAX_HEAP_ALLOCS];  /* raw ptr from malloc() */
+static void *heap_track_ptr[MAX_HEAP_ALLOCS];  /* aligned user ptr      */
+static int   heap_track_count = 0;
+
+/* Free all outstanding allocations – called by test runner after each case */
+void heap_reset(void) {
+    while (heap_track_count > 0) {
+        heap_track_count--;
+        free(heap_track_raw[heap_track_count]);
+    }
+}
 
 void* my_malloc(size_t size) {
     
@@ -57,13 +71,30 @@ void* my_malloc(size_t size) {
     // 우선 전체 할당 범위에만 태그 부여
     set_tag((void*)aligned_ptr, size);
 
+    // 할당 추적 등록
+    if (heap_track_count < MAX_HEAP_ALLOCS) {
+        heap_track_raw[heap_track_count] = (void*)raw_ptr;
+        heap_track_ptr[heap_track_count] = (void*)aligned_ptr;
+        heap_track_count++;
+    }
+
     // 32바이트 정렬된 메모리 블록의 시작 위치 반환
     return (void*)aligned_ptr;
 }
 
 
 void my_free(void* ptr) {
-    if (!ptr) return;  // NULL 포인터에 대한 보호
+    if (!ptr) return;
+
+    // 할당 추적에서 제거
+    for (int i = 0; i < heap_track_count; i++) {
+        if (heap_track_ptr[i] == ptr) {
+            heap_track_raw[i] = heap_track_raw[heap_track_count - 1];
+            heap_track_ptr[i] = heap_track_ptr[heap_track_count - 1];
+            heap_track_count--;
+            break;
+        }
+    }
 
     // 메타데이터 위치 계산
     HeapMetadata* metadata = (HeapMetadata*)(((uintptr_t)ptr - REDZONE_SIZE/2 - sizeof(HeapMetadata)) & ~(4 - 1));

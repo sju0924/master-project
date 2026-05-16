@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "application.h"
+#include "test_runner.h"
 #include <string.h>
 
 /* Private includes ----------------------------------------------------------*/
@@ -188,16 +189,12 @@ int main(void)
   /* USER CODE END 2 */
   srand(SysTick->VAL);
 
-  /* Infinite loop */
+  /* Run all test cases once, then idle */
   /* USER CODE BEGIN WHILE */
-  
+  run_all_tests();
+
   while (1)
   {
-    
-        application();
-
-        
-    
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

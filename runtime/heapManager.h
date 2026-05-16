@@ -17,3 +17,6 @@ void MPU_ConfigureRegion(uint32_t region_num, uint32_t enable, uint32_t base_add
 #define  MPU_REGION_DISABLE              0U
 #define  MPU_PRIVILEGED_DEFAULT          4U
 #define  MPU_REGION_PRIV_RO              2U
+
+/* Free all outstanding my_malloc allocations (for test-case recovery) */
+void heap_reset(void);

@@ -93,7 +93,16 @@ add_custom_target(
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMAND llc-18 -filetype=obj -march=arm -mcpu=cortex-m33 --float-abi=hard output.ll -o output.o
     COMMAND arm-none-eabi-gcc -c ../stm32/startup_stm32l562xx.s -o startup.o
-    COMMAND arm-none-eabi-gcc output.o startup.o runtime/runtime.o -DSTM32_ENV -o firmware.elf -T ../stm32/STM32L562xE_SHADOW.ld -mcpu=cortex-m33 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-short-enums --specs=nosys.specs
+    COMMAND arm-none-eabi-gcc -c -mcpu=cortex-m33 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
+        -DUSE_FULL_LL_DRIVER -DUSE_HAL_DRIVER -DSTM32L562xx
+        -I${CMAKE_SOURCE_DIR}/stm32/Core/Inc
+        -I${CMAKE_SOURCE_DIR}/stm32/Core/Inc/testcasesupport
+        -I${CMAKE_SOURCE_DIR}/stm32/Drivers/STM32L5xx_HAL_Driver/Inc
+        -I${CMAKE_SOURCE_DIR}/stm32/Drivers/STM32L5xx_HAL_Driver/Inc/Legacy
+        -I${CMAKE_SOURCE_DIR}/stm32/Drivers/CMSIS/Device/ST/STM32L5xx/Include
+        -I${CMAKE_SOURCE_DIR}/stm32/Drivers/CMSIS/Include
+        ${CMAKE_SOURCE_DIR}/stm32/Core/Src/test_runner.c -o test_runner.o
+    COMMAND arm-none-eabi-gcc output.o startup.o runtime/runtime.o test_runner.o -DSTM32_ENV -o firmware.elf -T ../stm32/STM32L562xE_SHADOW.ld -mcpu=cortex-m33 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-short-enums --specs=nosys.specs
     COMMAND arm-none-eabi-objcopy -O binary firmware.elf firmware.bin
 
 )

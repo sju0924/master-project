@@ -1,4 +1,11 @@
 #include "tagManager.h"
+#include <setjmp.h>
+#include <string.h>
+
+/* Shared with test_runner.c – resolved at link time */
+extern jmp_buf      g_test_recovery;
+extern volatile int g_test_running;
+extern volatile int g_error_detected;
 
 uint8_t prev_tag = 0;
 
@@ -197,4 +204,8 @@ uint8_t compare_tag(void* addr1, void* addr2) {
         handle_tag_mismatch(addr1, addr2);
         return FALSE; // Todo: mismatch 시 오류 처리할 핸들러 생성
     }
+}
+/* Clear entire tag memory region – called by test runner between test cases */
+void tags_reset(void) {
+    memset((void *)RAM_END, 0x00, 0x20030000U - RAM_END);
 }

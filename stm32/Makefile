@@ -291,7 +291,7 @@ $(LL_FILE): $(LL_FILES)
 
 # 모든 application/*.ll 파일을 링크하여 application.ll 생성
 $(APPLICATION_LL_FILE): $(APPLICATION_LL_FILES)
-	llvm-link-18 -o $
+	llvm-link-18 -o $@ $^
 
 $(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR) 
 	$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
