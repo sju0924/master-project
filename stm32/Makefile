@@ -110,7 +110,7 @@ endif
 HEX = $(CP) -O ihex
 BIN = $(CP) -O binary -S
 
-LLVM_CC = clang
+LLVM_CC = clang-18
  
 #######################################
 # CFLAGS
@@ -157,9 +157,10 @@ ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffuncti
 CFLAGS += $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
 
 TARGET_TRIPLE = arm-none-eabi
-GCC_ARM_PATH = /opt/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-eabi
+GCC_ARM_PATH = /usr
+GCC_SYSROOT = /usr/lib/arm-none-eabi
 LLVM_FLAGS = -O2 -emit-llvm -S --target=$(TARGET_TRIPLE) $(MCU) $(C_DEFS) $(C_INCLUDES)
-LLVM_FLAGS += --sysroot=$(GCC_ARM_PATH)/arm-none-eabi --gcc-toolchain=$(GCC_ARM_PATH) -Wall -fdata-sections -ffunction-sections -fno-inline -fno-elide-constructors -fno-builtin 
+LLVM_FLAGS += --sysroot=$(GCC_SYSROOT) --gcc-toolchain=$(GCC_ARM_PATH) -Wall -fdata-sections -ffunction-sections -fno-inline -fno-elide-constructors
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -gdwarf-2
@@ -286,12 +287,11 @@ $(APPLICATION_BUILD_DIR)/%.ll: %.c Makefile | $(APPLICATION_BUILD_DIR)
 
 # 모든 .ll 파일을 링크하여 output.ll 생성
 $(LL_FILE): $(LL_FILES)
-	llvm-link -o drivers.ll $(LL_FILES) 
+	llvm-link-18 -o drivers.ll $(LL_FILES)
 
 # 모든 application/*.ll 파일을 링크하여 application.ll 생성
 $(APPLICATION_LL_FILE): $(APPLICATION_LL_FILES)
-	llvm-link -o $@ $^
-
+	llvm-link-18 -o $
 
 $(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR) 
 	$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
