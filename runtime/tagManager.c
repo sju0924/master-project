@@ -182,6 +182,8 @@ uint8_t compare_tag(void* addr1, void* addr2) {
     uint8_t* tag1 = get_tag_address(addr1);
     uint8_t* tag2 = get_tag_address(addr2);
 
+    if (!tag1 || !tag2) return 0;
+
     // 태그 값 비교
     if (*tag1 == *tag2) {
         #ifdef DEBUG

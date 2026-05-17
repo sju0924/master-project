@@ -28,5 +28,8 @@ void CWE416_Use_After_Free__malloc_free_char_01_good();
 
 void CWE476_NULL_Pointer_Dereference__char_01_bad();
 void CWE476_NULL_Pointer_Dereference__char_01_good();
+int benchmark(void);
+int
+benchmark_insert_sort(void);
 
 #endif

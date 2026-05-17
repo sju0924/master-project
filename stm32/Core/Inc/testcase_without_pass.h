@@ -11,3 +11,7 @@ void CWE476_NULL_Pointer_Dereference__char_01_good_without_pass();
 
 void CWE124_Buffer_Underwrite__char_alloca_memcpy_01_good_without_pass();
 void CWE126_Buffer_Overread__malloc_char_loop_01_good_without_pass();
+
+int benchmark_without_pass (void);
+int
+benchmark_insert_sort_without_pass (void);

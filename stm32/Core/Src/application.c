@@ -27,14 +27,18 @@ void application(){
 
   //StartTimer(); 
   //resolution = CalculateTimerResolution();
-
+  // 보호x인 테스트케이스 위해 MPU 해제
+  HAL_MPU_Disable();
   // Pass 적용 시간 측정
   start_tick = HAL_GetTick();
 
-  for(int i = 0 ; i<100 ; i++){
+  
     //CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good();
-    CWE124_Buffer_Underwrite__char_alloca_memcpy_01_good();
+  for (int i = 0 ; i<100 ; i++){
+    benchmark_insert_sort_without_pass();
   }
+    
+
   
   end_tick = HAL_GetTick();
 
@@ -47,17 +51,18 @@ void application(){
     sprintf(log_buffer, "start tick: %u, end tick: %u\r\n",  start_tick, end_tick);
   uart_send_string(log_buffer);
 
+HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 
-  // 보호x인 테스트케이스 위해 MPU 해제
-  HAL_MPU_Disable();
   // Pass 적용 전 시간 측정
   start_tick = HAL_GetTick();
 
-  for(int i = 0 ; i<100 ; i++){
-    //CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good_without_pass();
-    CWE124_Buffer_Underwrite__char_alloca_memcpy_01_good_without_pass();
-  }
   
+    //CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good_without_pass();
+    for (int i = 0 ; i<100 ; i++){
+      benchmark_insert_sort();
+    }
+  
+
   end_tick = HAL_GetTick();
 
 
@@ -72,10 +77,8 @@ void application(){
   const char* msg1 = "Good passed\r\n";
   uart_send_string(msg1);
 
-  // bad testcase를 위한 보호 설정
-  HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
   //CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_bad();
-  CWE124_Buffer_Underwrite__char_alloca_memcpy_01_bad();
+  CWE126_Buffer_Overread__malloc_char_loop_01_bad();
 }
 void test_struct_tagging(){
   char not_struct[11]={'N','O','T',' ','S','T','R','U','C','T','\n'};
