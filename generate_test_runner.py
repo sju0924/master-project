@@ -14,36 +14,38 @@ Usage:
 import os
 import re
 
-PROJ_ROOT   = os.path.dirname(os.path.abspath(__file__))
-TC_DIR      = os.path.join(PROJ_ROOT, "juliet-dynamic", "testcases")
-RUNNER_OUT  = os.path.join(PROJ_ROOT, "stm32", "Core", "Src", "test_runner.c")
-HEADER_OUT  = os.path.join(PROJ_ROOT, "test_cases_testcases.h")
+PROJ_ROOT    = os.path.dirname(os.path.abspath(__file__))
+JULIET_DIR   = os.path.join(PROJ_ROOT, "juliet-dynamic", "testcases")
+LOCAL_TC_DIR = os.path.join(PROJ_ROOT, "stm32", "Core", "Src", "testcases")
+RUNNER_OUT   = os.path.join(PROJ_ROOT, "stm32", "Core", "Src", "test_runner.c")
+HEADER_OUT   = os.path.join(PROJ_ROOT, "test_cases_testcases.h")
 
-# (CWE-dir, subdir-or-None) — skip socket/network and C++-only dirs
+# (base_dir, CWE-dir, subdir-or-None) — skip socket/network and C++-only dirs
 TARGETS = [
-    ("CWE121_Stack_Based_Buffer_Overflow", "s02"),
-    ("CWE121_Stack_Based_Buffer_Overflow", "s03"),
-    ("CWE121_Stack_Based_Buffer_Overflow", "s04"),
-    ("CWE121_Stack_Based_Buffer_Overflow", "s05"),
-    ("CWE121_Stack_Based_Buffer_Overflow", "s06"),
-    ("CWE121_Stack_Based_Buffer_Overflow", "s07"),
-    ("CWE121_Stack_Based_Buffer_Overflow", "s08"),
-    ("CWE121_Stack_Based_Buffer_Overflow", "s09"),
-    ("CWE122_Heap_Based_Buffer_Overflow",  "s01"),
-    ("CWE122_Heap_Based_Buffer_Overflow",  "s05"),
-    ("CWE122_Heap_Based_Buffer_Overflow",  "s06"),
-    ("CWE122_Heap_Based_Buffer_Overflow",  "s07"),
-    ("CWE122_Heap_Based_Buffer_Overflow",  "s08"),
-    ("CWE122_Heap_Based_Buffer_Overflow",  "s09"),
-    ("CWE122_Heap_Based_Buffer_Overflow",  "s10"),
-    ("CWE122_Heap_Based_Buffer_Overflow",  "s11"),
-    ("CWE124_Buffer_Underwrite",           "s02"),
-    ("CWE124_Buffer_Underwrite",           "s03"),
-    ("CWE124_Buffer_Underwrite",           "s04"),
-    ("CWE126_Buffer_Overread",             "s02"),
-    ("CWE415_Double_Free",                 "s01"),
-    ("CWE416_Use_After_Free",              None),
-    ("CWE476_NULL_Pointer_Dereference",    None),
+    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s02"),
+    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s03"),
+    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s04"),
+    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s05"),
+    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s06"),
+    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s07"),
+    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s08"),
+    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s09"),
+    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s01"),
+    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s05"),
+    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s06"),
+    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s07"),
+    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s08"),
+    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s09"),
+    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s10"),
+    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s11"),
+    (JULIET_DIR,   "CWE124_Buffer_Underwrite",           "s02"),
+    (JULIET_DIR,   "CWE124_Buffer_Underwrite",           "s03"),
+    (JULIET_DIR,   "CWE124_Buffer_Underwrite",           "s04"),
+    (JULIET_DIR,   "CWE126_Buffer_Overread",             "s02"),
+    # CWE415/416/476 are not in ispras/juliet-dynamic — kept as local files
+    (LOCAL_TC_DIR, "CWE415_Double_Free",                 "s01"),
+    (LOCAL_TC_DIR, "CWE416_Use_After_Free",              None),
+    (LOCAL_TC_DIR, "CWE476_NULL_Pointer_Dereference",    None),
 ]
 
 # Matches the top-level bad() entry point: void CWE..._01_bad() with no args
@@ -67,8 +69,8 @@ def find_primary(filepath):
 
 def scan():
     entries = []
-    for cwe_dir, subdir in TARGETS:
-        d = os.path.join(TC_DIR, cwe_dir, subdir) if subdir else os.path.join(TC_DIR, cwe_dir)
+    for base_dir, cwe_dir, subdir in TARGETS:
+        d = os.path.join(base_dir, cwe_dir, subdir) if subdir else os.path.join(base_dir, cwe_dir)
         if not os.path.isdir(d):
             print(f"  [skip] {d} — not found (submodule initialised?)")
             continue
@@ -240,7 +242,7 @@ def generate_header(entries):
     return "\n".join(lines) + "\n"
 
 def main():
-    if not os.path.isdir(TC_DIR):
+    if not os.path.isdir(JULIET_DIR):
         print("ERROR: juliet-dynamic submodule not found.")
         print("Run: git submodule update --init")
         return
