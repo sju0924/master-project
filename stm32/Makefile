@@ -235,12 +235,26 @@ $(BUILD_DIR)/stm32l5xx_ll_usb.ll \
 $(BUILD_DIR)/system_stm32l5xx.ll \
 $(BUILD_DIR)/main.ll 
 
-TEST_CASE_DIR = Core/Src/testcases
+TEST_CASE_DIR = ../juliet-dynamic/testcases
 APPLICATION_BUILD_DIR = build/application
-APPLICATION_LL_FILE = $(BUILD_DIR)/application.ll 
+APPLICATION_LL_FILE = $(BUILD_DIR)/application.ll
 
-APPLICATION_C_SOURCES = $(wildcard $(TEST_CASE_DIR)/CWE121_Stack_Based_Buffer_Overflow/s09/*.c) \
+APPLICATION_C_SOURCES = $(wildcard $(TEST_CASE_DIR)/CWE121_Stack_Based_Buffer_Overflow/s02/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE121_Stack_Based_Buffer_Overflow/s03/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE121_Stack_Based_Buffer_Overflow/s04/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE121_Stack_Based_Buffer_Overflow/s05/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE121_Stack_Based_Buffer_Overflow/s06/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE121_Stack_Based_Buffer_Overflow/s07/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE121_Stack_Based_Buffer_Overflow/s08/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE121_Stack_Based_Buffer_Overflow/s09/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE122_Heap_Based_Buffer_Overflow/s01/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE122_Heap_Based_Buffer_Overflow/s05/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE122_Heap_Based_Buffer_Overflow/s06/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE122_Heap_Based_Buffer_Overflow/s07/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE122_Heap_Based_Buffer_Overflow/s08/*.c) \
 						$(wildcard $(TEST_CASE_DIR)/CWE122_Heap_Based_Buffer_Overflow/s09/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE122_Heap_Based_Buffer_Overflow/s10/*.c) \
+						$(wildcard $(TEST_CASE_DIR)/CWE122_Heap_Based_Buffer_Overflow/s11/*.c) \
 						$(wildcard $(TEST_CASE_DIR)/CWE124_Buffer_Underwrite/s02/*.c) \
 						$(wildcard $(TEST_CASE_DIR)/CWE124_Buffer_Underwrite/s03/*.c) \
 						$(wildcard $(TEST_CASE_DIR)/CWE124_Buffer_Underwrite/s04/*.c) \

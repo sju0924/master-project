@@ -61,13 +61,43 @@ typedef struct {
     void (*good)(void);
 } TestCase;
 
-/* forward declarations */
+/* forward declarations — CWE121 */
+void CWE121_Stack_Based_Buffer_Overflow__CWE193_char_alloca_loop_01_bad(void);
+void CWE121_Stack_Based_Buffer_Overflow__CWE193_char_alloca_loop_01_good(void);
+void CWE121_Stack_Based_Buffer_Overflow__CWE193_wchar_t_declare_loop_01_bad(void);
+void CWE121_Stack_Based_Buffer_Overflow__CWE193_wchar_t_declare_loop_01_good(void);
+void CWE121_Stack_Based_Buffer_Overflow__CWE805_char_declare_snprintf_01_bad(void);
+void CWE121_Stack_Based_Buffer_Overflow__CWE805_char_declare_snprintf_01_good(void);
+void CWE121_Stack_Based_Buffer_Overflow__CWE805_struct_alloca_memmove_01_bad(void);
+void CWE121_Stack_Based_Buffer_Overflow__CWE805_struct_alloca_memmove_01_good(void);
+void CWE121_Stack_Based_Buffer_Overflow__CWE805_wchar_t_declare_snprintf_01_bad(void);
+void CWE121_Stack_Based_Buffer_Overflow__CWE805_wchar_t_declare_snprintf_01_good(void);
+void CWE121_Stack_Based_Buffer_Overflow__CWE806_char_declare_snprintf_01_bad(void);
+void CWE121_Stack_Based_Buffer_Overflow__CWE806_char_declare_snprintf_01_good(void);
+void CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_snprintf_01_bad(void);
+void CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_snprintf_01_good(void);
 void CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_bad(void);
 void CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good(void);
 
+/* forward declarations — CWE122 */
+void CWE122_Heap_Based_Buffer_Overflow__char_type_overrun_memcpy_01_bad(void);
+void CWE122_Heap_Based_Buffer_Overflow__char_type_overrun_memcpy_01_good(void);
+void CWE122_Heap_Based_Buffer_Overflow__CWE131_loop_01_bad(void);
+void CWE122_Heap_Based_Buffer_Overflow__CWE131_loop_01_good(void);
+void CWE122_Heap_Based_Buffer_Overflow__CWE131_memmove_01_bad(void);
+void CWE122_Heap_Based_Buffer_Overflow__CWE131_memmove_01_good(void);
+void CWE122_Heap_Based_Buffer_Overflow__c_CWE193_char_memmove_01_bad(void);
+void CWE122_Heap_Based_Buffer_Overflow__c_CWE193_char_memmove_01_good(void);
+void CWE122_Heap_Based_Buffer_Overflow__c_CWE805_char_snprintf_01_bad(void);
+void CWE122_Heap_Based_Buffer_Overflow__c_CWE805_char_snprintf_01_good(void);
 void CWE122_Heap_Based_Buffer_Overflow__c_CWE805_wchar_t_memmove_01_bad(void);
 void CWE122_Heap_Based_Buffer_Overflow__c_CWE805_wchar_t_memmove_01_good(void);
+void CWE122_Heap_Based_Buffer_Overflow__c_CWE806_wchar_t_memmove_01_bad(void);
+void CWE122_Heap_Based_Buffer_Overflow__c_CWE806_wchar_t_memmove_01_good(void);
+void CWE122_Heap_Based_Buffer_Overflow__sizeof_double_01_bad(void);
+void CWE122_Heap_Based_Buffer_Overflow__sizeof_double_01_good(void);
 
+/* forward declarations — CWE124 */
 void CWE124_Buffer_Underwrite__CWE839_negative_01_bad(void);
 void CWE124_Buffer_Underwrite__CWE839_negative_01_good(void);
 void CWE124_Buffer_Underwrite__new_char_cpy_01_bad(void);
@@ -75,64 +105,104 @@ void CWE124_Buffer_Underwrite__new_char_cpy_01_good(void);
 void CWE124_Buffer_Underwrite__char_alloca_memcpy_01_bad(void);
 void CWE124_Buffer_Underwrite__char_alloca_memcpy_01_good(void);
 
+/* forward declarations — CWE126, CWE415, CWE416, CWE476 */
 void CWE126_Buffer_Overread__malloc_char_loop_01_bad(void);
 void CWE126_Buffer_Overread__malloc_char_loop_01_good(void);
-
 void CWE415_Double_Free__malloc_free_char_01_bad(void);
 void CWE415_Double_Free__malloc_free_char_01_good(void);
-
 void CWE416_Use_After_Free__malloc_free_char_01_bad(void);
 void CWE416_Use_After_Free__malloc_free_char_01_good(void);
-
 void CWE476_NULL_Pointer_Dereference__char_01_bad(void);
 void CWE476_NULL_Pointer_Dereference__char_01_good(void);
+void CWE476_NULL_Pointer_Dereference__binary_if_01_bad(void);
+void CWE476_NULL_Pointer_Dereference__binary_if_01_good(void);
 
 static const TestCase test_table[] = {
-    {
-        "CWE121 Stack Overflow  (src_char_declare_cpy_01)",
-        CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_bad,
-        CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good
-    },
-    {
-        "CWE122 Heap Overflow   (CWE805_wchar_t_memmove_01)",
-        CWE122_Heap_Based_Buffer_Overflow__c_CWE805_wchar_t_memmove_01_bad,
-        CWE122_Heap_Based_Buffer_Overflow__c_CWE805_wchar_t_memmove_01_good
-    },
-    {
-        "CWE124 Buf Underwrite  (CWE839_negative_01)",
-        CWE124_Buffer_Underwrite__CWE839_negative_01_bad,
-        CWE124_Buffer_Underwrite__CWE839_negative_01_good
-    },
-    {
-        "CWE124 Buf Underwrite  (new_char_cpy_01)",
-        CWE124_Buffer_Underwrite__new_char_cpy_01_bad,
-        CWE124_Buffer_Underwrite__new_char_cpy_01_good
-    },
-    {
-        "CWE124 Buf Underwrite  (char_alloca_memcpy_01)",
-        CWE124_Buffer_Underwrite__char_alloca_memcpy_01_bad,
-        CWE124_Buffer_Underwrite__char_alloca_memcpy_01_good
-    },
-    {
-        "CWE126 Buf Overread    (malloc_char_loop_01)",
-        CWE126_Buffer_Overread__malloc_char_loop_01_bad,
-        CWE126_Buffer_Overread__malloc_char_loop_01_good
-    },
-    {
-        "CWE415 Double Free     (malloc_free_char_01)",
-        CWE415_Double_Free__malloc_free_char_01_bad,
-        CWE415_Double_Free__malloc_free_char_01_good
-    },
-    {
-        "CWE416 Use After Free  (malloc_free_char_01)",
-        CWE416_Use_After_Free__malloc_free_char_01_bad,
-        CWE416_Use_After_Free__malloc_free_char_01_good
-    },
-    {
-        "CWE476 NULL Ptr Deref  (char_01)",
-        CWE476_NULL_Pointer_Dereference__char_01_bad,
-        CWE476_NULL_Pointer_Dereference__char_01_good
-    },
+    /* CWE121 — Stack-Based Buffer Overflow */
+    { "CWE121 (CWE193_char_alloca_loop_01)",
+      CWE121_Stack_Based_Buffer_Overflow__CWE193_char_alloca_loop_01_bad,
+      CWE121_Stack_Based_Buffer_Overflow__CWE193_char_alloca_loop_01_good },
+    { "CWE121 (CWE193_wchar_t_declare_loop_01)",
+      CWE121_Stack_Based_Buffer_Overflow__CWE193_wchar_t_declare_loop_01_bad,
+      CWE121_Stack_Based_Buffer_Overflow__CWE193_wchar_t_declare_loop_01_good },
+    { "CWE121 (CWE805_char_declare_snprintf_01)",
+      CWE121_Stack_Based_Buffer_Overflow__CWE805_char_declare_snprintf_01_bad,
+      CWE121_Stack_Based_Buffer_Overflow__CWE805_char_declare_snprintf_01_good },
+    { "CWE121 (CWE805_struct_alloca_memmove_01)",
+      CWE121_Stack_Based_Buffer_Overflow__CWE805_struct_alloca_memmove_01_bad,
+      CWE121_Stack_Based_Buffer_Overflow__CWE805_struct_alloca_memmove_01_good },
+    { "CWE121 (CWE805_wchar_t_declare_snprintf_01)",
+      CWE121_Stack_Based_Buffer_Overflow__CWE805_wchar_t_declare_snprintf_01_bad,
+      CWE121_Stack_Based_Buffer_Overflow__CWE805_wchar_t_declare_snprintf_01_good },
+    { "CWE121 (CWE806_char_declare_snprintf_01)",
+      CWE121_Stack_Based_Buffer_Overflow__CWE806_char_declare_snprintf_01_bad,
+      CWE121_Stack_Based_Buffer_Overflow__CWE806_char_declare_snprintf_01_good },
+    { "CWE121 (CWE806_wchar_t_declare_snprintf_01)",
+      CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_snprintf_01_bad,
+      CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_snprintf_01_good },
+    { "CWE121 (src_char_declare_cpy_01)",
+      CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_bad,
+      CWE121_Stack_Based_Buffer_Overflow__src_char_declare_cpy_01_good },
+
+    /* CWE122 — Heap-Based Buffer Overflow */
+    { "CWE122 (char_type_overrun_memcpy_01)",
+      CWE122_Heap_Based_Buffer_Overflow__char_type_overrun_memcpy_01_bad,
+      CWE122_Heap_Based_Buffer_Overflow__char_type_overrun_memcpy_01_good },
+    { "CWE122 (CWE131_loop_01)",
+      CWE122_Heap_Based_Buffer_Overflow__CWE131_loop_01_bad,
+      CWE122_Heap_Based_Buffer_Overflow__CWE131_loop_01_good },
+    { "CWE122 (CWE131_memmove_01)",
+      CWE122_Heap_Based_Buffer_Overflow__CWE131_memmove_01_bad,
+      CWE122_Heap_Based_Buffer_Overflow__CWE131_memmove_01_good },
+    { "CWE122 (c_CWE193_char_memmove_01)",
+      CWE122_Heap_Based_Buffer_Overflow__c_CWE193_char_memmove_01_bad,
+      CWE122_Heap_Based_Buffer_Overflow__c_CWE193_char_memmove_01_good },
+    { "CWE122 (c_CWE805_char_snprintf_01)",
+      CWE122_Heap_Based_Buffer_Overflow__c_CWE805_char_snprintf_01_bad,
+      CWE122_Heap_Based_Buffer_Overflow__c_CWE805_char_snprintf_01_good },
+    { "CWE122 (c_CWE805_wchar_t_memmove_01)",
+      CWE122_Heap_Based_Buffer_Overflow__c_CWE805_wchar_t_memmove_01_bad,
+      CWE122_Heap_Based_Buffer_Overflow__c_CWE805_wchar_t_memmove_01_good },
+    { "CWE122 (c_CWE806_wchar_t_memmove_01)",
+      CWE122_Heap_Based_Buffer_Overflow__c_CWE806_wchar_t_memmove_01_bad,
+      CWE122_Heap_Based_Buffer_Overflow__c_CWE806_wchar_t_memmove_01_good },
+    { "CWE122 (sizeof_double_01)",
+      CWE122_Heap_Based_Buffer_Overflow__sizeof_double_01_bad,
+      CWE122_Heap_Based_Buffer_Overflow__sizeof_double_01_good },
+
+    /* CWE124 — Buffer Underwrite */
+    { "CWE124 (CWE839_negative_01)",
+      CWE124_Buffer_Underwrite__CWE839_negative_01_bad,
+      CWE124_Buffer_Underwrite__CWE839_negative_01_good },
+    { "CWE124 (new_char_cpy_01)",
+      CWE124_Buffer_Underwrite__new_char_cpy_01_bad,
+      CWE124_Buffer_Underwrite__new_char_cpy_01_good },
+    { "CWE124 (char_alloca_memcpy_01)",
+      CWE124_Buffer_Underwrite__char_alloca_memcpy_01_bad,
+      CWE124_Buffer_Underwrite__char_alloca_memcpy_01_good },
+
+    /* CWE126 — Buffer Overread */
+    { "CWE126 (malloc_char_loop_01)",
+      CWE126_Buffer_Overread__malloc_char_loop_01_bad,
+      CWE126_Buffer_Overread__malloc_char_loop_01_good },
+
+    /* CWE415 — Double Free */
+    { "CWE415 (malloc_free_char_01)",
+      CWE415_Double_Free__malloc_free_char_01_bad,
+      CWE415_Double_Free__malloc_free_char_01_good },
+
+    /* CWE416 — Use After Free */
+    { "CWE416 (malloc_free_char_01)",
+      CWE416_Use_After_Free__malloc_free_char_01_bad,
+      CWE416_Use_After_Free__malloc_free_char_01_good },
+
+    /* CWE476 — NULL Pointer Dereference */
+    { "CWE476 (char_01)",
+      CWE476_NULL_Pointer_Dereference__char_01_bad,
+      CWE476_NULL_Pointer_Dereference__char_01_good },
+    { "CWE476 (binary_if_01)",
+      CWE476_NULL_Pointer_Dereference__binary_if_01_bad,
+      CWE476_NULL_Pointer_Dereference__binary_if_01_good },
 };
 
 #define NUM_TESTS  (sizeof(test_table) / sizeof(test_table[0]))
