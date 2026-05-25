@@ -41,6 +41,8 @@ Core/Src/stm32l5xx_it.c \
 Core/Src/stm32l5xx_hal_msp.c \
 Core/Src/io.c \
 Core/Src/testcase_without_pass.c\
+Core/Src/test_runner.c \
+Core/Src/pass_stubs.c \
 Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_utils.c \
 Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_exti.c \
 Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_adc.c \
@@ -83,7 +85,12 @@ Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_dma.c \
 Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_pcd.c \
 Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_hal_pcd_ex.c \
 Drivers/STM32L5xx_HAL_Driver/Src/stm32l5xx_ll_usb.c \
-Core/Src/system_stm32l5xx.c  
+Core/Src/system_stm32l5xx.c \
+../runtime/MPU.c \
+../runtime/heapManager.c \
+../runtime/tagManager.c \
+../runtime/intrinsicFunction.c \
+../runtime/syscalls.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -145,6 +152,7 @@ AS_INCLUDES =
 C_INCLUDES =  \
 -ICore/Inc \
 -ICore/Inc/testcasesupport\
+-I../runtime \
 -IDrivers/STM32L5xx_HAL_Driver/Inc \
 -IDrivers/STM32L5xx_HAL_Driver/Inc/Legacy \
 -IDrivers/CMSIS/Device/ST/STM32L5xx/Include \
@@ -235,40 +243,53 @@ $(BUILD_DIR)/stm32l5xx_ll_usb.ll \
 $(BUILD_DIR)/system_stm32l5xx.ll \
 $(BUILD_DIR)/main.ll 
 
-# juliet-dynamic submodule (CWE121/122/124/126)
+# juliet-dynamic testcases (manually placed)
 JULIET_DIR    = ../juliet-dynamic/testcases
-# local files for CWEs not in the submodule (CWE415/416/476)
 LOCAL_TC_DIR  = Core/Src/testcases
 APPLICATION_BUILD_DIR = build/application
 APPLICATION_LL_FILE = $(BUILD_DIR)/application.ll
 
-APPLICATION_C_SOURCES = $(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s02/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s03/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s04/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s05/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s06/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s07/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s08/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s09/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s01/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s05/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s06/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s07/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s08/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s09/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s10/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s11/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE124_Buffer_Underwrite/s02/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE124_Buffer_Underwrite/s03/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE124_Buffer_Underwrite/s04/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE126_Buffer_Overread/s02/*.c) \
-						$(wildcard $(LOCAL_TC_DIR)/CWE415_Double_Free/s01/*.c) \
-						$(wildcard $(LOCAL_TC_DIR)/CWE416_Use_After_Free/*.c) \
-						$(wildcard $(LOCAL_TC_DIR)/CWE476_NULL_Pointer_Dereference/*.c) \
-						Core/Src/application.c 
+ifdef CWE
+APPLICATION_C_SOURCES = \
+	$(shell find $(JULIET_DIR)/$(CWE) -name "*.c" 2>/dev/null) \
+	Core/Src/application.c
+else
+APPLICATION_C_SOURCES = \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s02/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s03/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s04/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s05/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s06/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s07/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s08/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s09/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s01/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s05/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s06/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s07/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s08/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s09/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s10/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s11/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE124_Buffer_Underwrite/s02/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE124_Buffer_Underwrite/s03/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE124_Buffer_Underwrite/s04/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE126_Buffer_Overread/s02/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE126_Buffer_Overread/s03/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE127_Buffer_Underread/s02/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE127_Buffer_Underread/s04/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE191_Integer_Underflow/s02/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE191_Integer_Underflow/s03/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE415_Double_Free/s01/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE416_Use_After_Free/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE476_NULL_Pointer_Dereference/*.c) \
+	Core/Src/application.c
+endif
+APPLICATION_C_SOURCES := $(foreach f,$(APPLICATION_C_SOURCES),$(if $(findstring socket,$(f)),,$(f)))
 
 APPLICATION_LL_FILES = $(addprefix $(APPLICATION_BUILD_DIR)/, $(notdir $(APPLICATION_C_SOURCES:.c=.ll)))
-APPLICATION_FLAGS = -Dmalloc=my_malloc -Dfree=my_free -Dmemcpy=my_memcpy -Dmemset=my_memset -Dstrcpy=my_strcpy 
+APPLICATION_OBJ_FILES = $(addprefix $(APPLICATION_BUILD_DIR)/, $(notdir $(APPLICATION_C_SOURCES:.c=.o)))
+APPLICATION_FLAGS = -Dmalloc=my_malloc -Dfree=my_free -Dmemcpy=my_memcpy -Dmemset=my_memset -Dstrcpy=my_strcpy
 # default action: build all
 all: $(LL_FILE) $(APPLICATION_LL_FILE)
 direct: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin
@@ -304,7 +325,7 @@ $(APPLICATION_BUILD_DIR)/%.ll: %.c Makefile | $(APPLICATION_BUILD_DIR)
 
 # 모든 .ll 파일을 링크하여 output.ll 생성
 $(LL_FILE): $(LL_FILES)
-	llvm-link-18 -o drivers.ll $(LL_FILES)
+	llvm-link-18 -o $@ $(LL_FILES)
 
 # 모든 application/*.ll 파일을 링크하여 application.ll 생성
 $(APPLICATION_LL_FILE): $(APPLICATION_LL_FILES)
@@ -321,8 +342,11 @@ $(BUILD_DIR)/%.bc: %.c Makefile | $(BUILD_DIR)
 $(BUILD_DIR)/%.o: %.s Makefile | $(BUILD_DIR)
 	$(AS) -c $(CFLAGS) $< -o $@
 
-$(BUILD_DIR)/$(TARGET).elf: $(OBJECTS) Makefile
-	$(CC) $(OBJECTS) $(LDFLAGS) -o $@
+$(APPLICATION_BUILD_DIR)/%.o: %.c Makefile | $(APPLICATION_BUILD_DIR)
+	$(CC) -c $(CFLAGS) $(APPLICATION_FLAGS) $< -o $@
+
+$(BUILD_DIR)/$(TARGET).elf: $(OBJECTS) $(APPLICATION_OBJ_FILES) Makefile
+	$(CC) $(OBJECTS) $(APPLICATION_OBJ_FILES) $(LDFLAGS) -o $@
 	$(SZ) $@
 
 $(BUILD_DIR)/%.hex: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
