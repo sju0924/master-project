@@ -52,7 +52,7 @@ void printLongLine (long longNumber)
 
 void printLongLongLine (int64_t longLongIntNumber)
 {
-    printf("%" PRId64 "\n", longLongIntNumber);
+    printf("%lld\n", (long long)longLongIntNumber);
 }
 
 void printSizeTLine (size_t sizeTNumber)
