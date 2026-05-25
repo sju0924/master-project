@@ -235,37 +235,43 @@ $(BUILD_DIR)/stm32l5xx_ll_usb.ll \
 $(BUILD_DIR)/system_stm32l5xx.ll \
 $(BUILD_DIR)/main.ll 
 
-# juliet-dynamic submodule (CWE121/122/124/126)
+# juliet-dynamic testcases (manually placed)
 JULIET_DIR    = ../juliet-dynamic/testcases
-# local files for CWEs not in the submodule (CWE415/416/476)
 LOCAL_TC_DIR  = Core/Src/testcases
 APPLICATION_BUILD_DIR = build/application
 APPLICATION_LL_FILE = $(BUILD_DIR)/application.ll
 
-APPLICATION_C_SOURCES = $(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s02/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s03/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s04/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s05/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s06/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s07/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s08/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s09/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s01/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s05/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s06/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s07/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s08/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s09/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s10/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s11/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE124_Buffer_Underwrite/s02/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE124_Buffer_Underwrite/s03/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE124_Buffer_Underwrite/s04/*.c) \
-						$(wildcard $(JULIET_DIR)/CWE126_Buffer_Overread/s02/*.c) \
-						$(wildcard $(LOCAL_TC_DIR)/CWE415_Double_Free/s01/*.c) \
-						$(wildcard $(LOCAL_TC_DIR)/CWE416_Use_After_Free/*.c) \
-						$(wildcard $(LOCAL_TC_DIR)/CWE476_NULL_Pointer_Dereference/*.c) \
-						Core/Src/application.c 
+APPLICATION_C_SOURCES = \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s02/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s03/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s04/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s05/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s06/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s07/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s08/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE121_Stack_Based_Buffer_Overflow/s09/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s01/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s05/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s06/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s07/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s08/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s09/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s10/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE122_Heap_Based_Buffer_Overflow/s11/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE124_Buffer_Underwrite/s02/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE124_Buffer_Underwrite/s03/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE124_Buffer_Underwrite/s04/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE126_Buffer_Overread/s02/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE126_Buffer_Overread/s03/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE127_Buffer_Underread/s02/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE127_Buffer_Underread/s04/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE191_Integer_Underflow/s02/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE191_Integer_Underflow/s03/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE415_Double_Free/s01/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE416_Use_After_Free/*.c) \
+	$(wildcard $(JULIET_DIR)/CWE476_NULL_Pointer_Dereference/*.c) \
+	Core/Src/application.c
+APPLICATION_C_SOURCES := $(foreach f,$(APPLICATION_C_SOURCES),$(if $(findstring socket,$(f)),,$(f)))
 
 APPLICATION_LL_FILES = $(addprefix $(APPLICATION_BUILD_DIR)/, $(notdir $(APPLICATION_C_SOURCES:.c=.ll)))
 APPLICATION_FLAGS = -Dmalloc=my_malloc -Dfree=my_free -Dmemcpy=my_memcpy -Dmemset=my_memset -Dstrcpy=my_strcpy 

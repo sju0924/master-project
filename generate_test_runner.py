@@ -20,33 +20,48 @@ LOCAL_TC_DIR = os.path.join(PROJ_ROOT, "stm32", "Core", "Src", "testcases")
 RUNNER_OUT   = os.path.join(PROJ_ROOT, "stm32", "Core", "Src", "test_runner.c")
 HEADER_OUT   = os.path.join(PROJ_ROOT, "test_cases_testcases.h")
 
-# (base_dir, CWE-dir, subdir-or-None) — skip socket/network and C++-only dirs
-TARGETS = [
-    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s02"),
-    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s03"),
-    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s04"),
-    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s05"),
-    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s06"),
-    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s07"),
-    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s08"),
-    (JULIET_DIR,   "CWE121_Stack_Based_Buffer_Overflow", "s09"),
-    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s01"),
-    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s05"),
-    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s06"),
-    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s07"),
-    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s08"),
-    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s09"),
-    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s10"),
-    (JULIET_DIR,   "CWE122_Heap_Based_Buffer_Overflow",  "s11"),
-    (JULIET_DIR,   "CWE124_Buffer_Underwrite",           "s02"),
-    (JULIET_DIR,   "CWE124_Buffer_Underwrite",           "s03"),
-    (JULIET_DIR,   "CWE124_Buffer_Underwrite",           "s04"),
-    (JULIET_DIR,   "CWE126_Buffer_Overread",             "s02"),
-    # CWE415/416/476 are not in ispras/juliet-dynamic — kept as local files
-    (LOCAL_TC_DIR, "CWE415_Double_Free",                 "s01"),
-    (LOCAL_TC_DIR, "CWE416_Use_After_Free",              None),
-    (LOCAL_TC_DIR, "CWE476_NULL_Pointer_Dereference",    None),
-]
+# Subdirs whose first .c file name contains these patterns use stdin/sockets
+# and are incompatible with bare-metal STM32 — skip them.
+SKIP_SOURCE_PATTERNS = ["socket", "fscanf", "fgets", "file_"]
+
+
+def _has_c_files(dirpath):
+    return any(f.endswith(".c") for f in os.listdir(dirpath))
+
+
+def _is_compatible_subdir(dirpath):
+    """Return True if the dir has .c files and doesn't look socket/fscanf-based."""
+    c_files = sorted(f for f in os.listdir(dirpath) if f.endswith(".c"))
+    if not c_files:
+        return False
+    first = c_files[0].lower()
+    return not any(pat in first for pat in SKIP_SOURCE_PATTERNS)
+
+
+def discover_targets():
+    """Walk juliet-dynamic/testcases and return all compatible (base, cwe, subdir) tuples."""
+    if not os.path.isdir(JULIET_DIR):
+        print(f"  [warn] {JULIET_DIR} not found — falling back to LOCAL_TC_DIR")
+        return []
+    targets = []
+    for cwe_dir in sorted(os.listdir(JULIET_DIR)):
+        if not cwe_dir.startswith("CWE"):
+            continue
+        cwe_path = os.path.join(JULIET_DIR, cwe_dir)
+        if not os.path.isdir(cwe_path):
+            continue
+        subdirs = sorted(
+            d for d in os.listdir(cwe_path)
+            if re.match(r"s\d+$", d) and os.path.isdir(os.path.join(cwe_path, d))
+        )
+        if subdirs:
+            for sd in subdirs:
+                if _is_compatible_subdir(os.path.join(cwe_path, sd)):
+                    targets.append((JULIET_DIR, cwe_dir, sd))
+        else:
+            if _has_c_files(cwe_path) and _is_compatible_subdir(cwe_path):
+                targets.append((JULIET_DIR, cwe_dir, None))
+    return targets
 
 # Matches the top-level bad() entry point: void CWE..._01_bad() with no args
 BAD_RE = re.compile(
@@ -56,8 +71,11 @@ BAD_RE = re.compile(
 
 def find_primary(filepath):
     """Return (bad_fn, good_fn) if file defines a top-level _bad() entry."""
-    with open(filepath, encoding="utf-8", errors="replace") as f:
-        src = f.read()
+    try:
+        with open(filepath, encoding="utf-8", errors="replace") as f:
+            src = f.read()
+    except OSError:
+        return None
     m = BAD_RE.search(src)
     if not m:
         return None
@@ -69,10 +87,13 @@ def find_primary(filepath):
 
 def scan():
     entries = []
-    for base_dir, cwe_dir, subdir in TARGETS:
+    targets = discover_targets()
+    if not targets:
+        print("  [warn] no targets discovered from juliet-dynamic")
+        return entries
+    for base_dir, cwe_dir, subdir in targets:
         d = os.path.join(base_dir, cwe_dir, subdir) if subdir else os.path.join(base_dir, cwe_dir)
         if not os.path.isdir(d):
-            print(f"  [skip] {d} — not found (submodule initialised?)")
             continue
         for fname in sorted(os.listdir(d)):
             if not fname.endswith(".c"):
@@ -242,11 +263,6 @@ def generate_header(entries):
     return "\n".join(lines) + "\n"
 
 def main():
-    if not os.path.isdir(JULIET_DIR):
-        print("ERROR: juliet-dynamic submodule not found.")
-        print("Run: git submodule update --init")
-        return
-
     print("Scanning test cases …")
     entries = scan()
     print(f"  {len(entries)} primary test cases found")

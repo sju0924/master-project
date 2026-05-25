@@ -345,24 +345,33 @@ PreservedAnalyses StructMetadataPass::run(Module &M, ModuleAnalysisManager &AM) 
      
         
     // 전역 배열로 모듈에 추가
-    if(numMembers){
+    if(!offsetsArray.empty()){
+        // 모든 구조체 중 최대 멤버 수를 구해 inner 배열 타입을 통일
+        size_t maxMembers = 0;
+        for (size_t i = 0; i < offsetsArray.size(); ++i)
+            if (offsetsArray[i].size() > maxMembers)
+                maxMembers = offsetsArray[i].size();
+
+        ArrayType *innerArrayType = ArrayType::get(Type::getInt32Ty(Context), maxMembers);
+        Constant *zero = ConstantInt::get(Type::getInt32Ty(Context), 0);
+
         std::vector<Constant *> offsetsGlobalArray;
         std::vector<Constant *> sizesGlobalArray;
 
-
         for (size_t i = 0; i < offsetsArray.size(); ++i) {
-            ArrayType *innerOffsetsArrayType = ArrayType::get(Type::getInt32Ty(Context), offsetsArray[i].size());
-            ArrayType *innerSizesArrayType = ArrayType::get(Type::getInt32Ty(Context), sizesArray[i].size());
+            std::vector<Constant *> paddedOffsets = offsetsArray[i];
+            std::vector<Constant *> paddedSizes = sizesArray[i];
+            while (paddedOffsets.size() < maxMembers) paddedOffsets.push_back(zero);
+            while (paddedSizes.size() < maxMembers) paddedSizes.push_back(zero);
 
-            offsetsGlobalArray.push_back(ConstantArray::get(innerOffsetsArrayType, offsetsArray[i]));
-            sizesGlobalArray.push_back(ConstantArray::get(innerSizesArrayType, sizesArray[i]));
+            offsetsGlobalArray.push_back(ConstantArray::get(innerArrayType, paddedOffsets));
+            sizesGlobalArray.push_back(ConstantArray::get(innerArrayType, paddedSizes));
         }
 
-        ArrayType *outerOffsetsArrayType = ArrayType::get(offsetsGlobalArray[0]->getType(), offsetsGlobalArray.size());
-        ArrayType *outerSizesArrayType = ArrayType::get(sizesGlobalArray[0]->getType(), sizesGlobalArray.size());
+        ArrayType *outerArrayType = ArrayType::get(innerArrayType, offsetsGlobalArray.size());
 
-        new GlobalVariable(M, outerOffsetsArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(outerOffsetsArrayType, offsetsGlobalArray), "struct_member_offsets");
-        new GlobalVariable(M, outerSizesArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(outerSizesArrayType, sizesGlobalArray), "struct_member_sizes");
+        new GlobalVariable(M, outerArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(outerArrayType, offsetsGlobalArray), "struct_member_offsets");
+        new GlobalVariable(M, outerArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(outerArrayType, sizesGlobalArray), "struct_member_sizes");
         new GlobalVariable(M, ArrayType::get(Type::getInt32Ty(Context), countsArray.size()), true, GlobalValue::ExternalLinkage, ConstantArray::get(ArrayType::get(Type::getInt32Ty(Context), countsArray.size()), countsArray), "struct_member_counts");
 
    }
