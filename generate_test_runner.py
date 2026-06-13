@@ -11,6 +11,7 @@ Usage:
     python3 generate_test_runner.py
 """
 
+import argparse
 import os
 import re
 
@@ -30,12 +31,14 @@ def _has_c_files(dirpath):
 
 
 def _is_compatible_subdir(dirpath):
-    """Return True if the dir has .c files and doesn't look socket/fscanf-based."""
-    c_files = sorted(f for f in os.listdir(dirpath) if f.endswith(".c"))
-    if not c_files:
+    """Return True if the dir has at least one compatible *_01.c primary file."""
+    primary_files = sorted(f for f in os.listdir(dirpath) if f.endswith("_01.c"))
+    if not primary_files:
         return False
-    first = c_files[0].lower()
-    return not any(pat in first for pat in SKIP_SOURCE_PATTERNS)
+    return any(
+        not any(pat in f.lower() for pat in SKIP_SOURCE_PATTERNS)
+        for f in primary_files
+    )
 
 
 def discover_targets():
@@ -85,9 +88,13 @@ def find_primary(filepath):
         return None
     return bad_fn, good_fn
 
-def scan():
+def scan(cwe_filter=None, subdir_filter=None):
     entries = []
     targets = discover_targets()
+    if cwe_filter:
+        targets = [(b, c, s) for b, c, s in targets if c.startswith(cwe_filter)]
+    if subdir_filter:
+        targets = [(b, c, s) for b, c, s in targets if s == subdir_filter or s is None]
     if not targets:
         print("  [warn] no targets discovered from juliet-dynamic")
         return entries
@@ -96,7 +103,9 @@ def scan():
         if not os.path.isdir(d):
             continue
         for fname in sorted(os.listdir(d)):
-            if not fname.endswith(".c"):
+            if not fname.endswith("_01.c"):
+                continue
+            if any(pat in fname.lower() for pat in SKIP_SOURCE_PATTERNS):
                 continue
             result = find_primary(os.path.join(d, fname))
             if result is None:
@@ -220,7 +229,7 @@ void run_all_tests(void) {{
         g_test_running = 0;
 
         const char *verdict;
-        if      ( bad_caught && !good_fp) {{ verdict = "PASS    "; pass++; }}
+        if      ( bad_caught && !good_fp) {{ verdict = "PASS     "; pass++; }}
         else if (!bad_caught && !good_fp) {{ verdict = "FAIL-MISS"; fail++; }}
         else if ( bad_caught &&  good_fp) {{ verdict = "FAIL-FP  "; fail++; }}
         else                              {{ verdict = "FAIL-BOTH"; fail++; }}
@@ -263,8 +272,15 @@ def generate_header(entries):
     return "\n".join(lines) + "\n"
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cwe", default=None,
+                        help="Filter to one CWE prefix (e.g. CWE121)")
+    parser.add_argument("--subdir", default=None,
+                        help="Filter to one subdir (e.g. s02)")
+    args = parser.parse_args()
+
     print("Scanning test cases …")
-    entries = scan()
+    entries = scan(cwe_filter=args.cwe, subdir_filter=args.subdir)
     print(f"  {len(entries)} primary test cases found")
 
     with open(RUNNER_OUT, "w") as f:

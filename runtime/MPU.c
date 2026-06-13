@@ -203,38 +203,25 @@ int configure_mpu_redzone_for_call(uint32_t sp, uint32_t r7) {
 }
 
 void configure_mpu_redzone_for_return() {
-  
+    /* Region 0,1 은 이 함수가 속한 스택 프레임의 레드존이다.
+     * 함수가 리턴하면 해당 프레임은 소멸하므로 Region 0,1만 비활성화한다.
+     * Region 2~7 (힙 레드존, 글로벌 레드존, poison, null-ptr)은 그대로 유지해야
+     * UAF/힙 오버플로우/null-ptr 탐지가 caller 컨텍스트에서도 계속 작동한다.
+     *
+     * 이전 구현은 HAL_MPU_Disable()만 호출하고 재활성화하지 않아서
+     * 함수 리턴 직후 모든 MPU 보호가 사라지는 버그가 있었다. */
     HAL_MPU_Disable();
 
-    uint32_t sp, r7;
-    // __asm__ volatile("mov %0, sp" : "=r"(sp));  // 현재 SP 가져오기
-    // __asm__ volatile("mov %0, r7" : "=r"(r7));  // 현재 SP 가져오기
+    /* Region 0 비활성화: RNR = 0, RLAR bit0 = 0 */
+    *((volatile uint32_t *)0xE000ED98) = 0U;
+    *((volatile uint32_t *)0xE000EDA0) &= ~0x1UL;
 
-    // sp = sp & ~(uintptr_t)(ALIGNMENT - 1);
-    // r7 = (r7 + ALIGNMENT - 1) & ~(uintptr_t)(ALIGNMENT - 1);
+    /* Region 1 비활성화: RNR = 1, RLAR bit0 = 0 */
+    *((volatile uint32_t *)0xE000ED98) = 1U;
+    *((volatile uint32_t *)0xE000EDA0) &= ~0x1UL;
 
-    // // Red Zone의 앞뒤 주소 계산
-    // uint32_t front_addr = sp; // Redzone 0이 시작되는 주소
-    // uint32_t back_addr = r7; // Redzone 1이 시작하는 주소
-
-    // // 디버그
-    // #ifdef DEBUG
-    // char buffer[100];
-    // snprintf(buffer, sizeof(buffer), "Unset Stack Pointer and R7 values:  SP: %x, R7: %x", sp, r7);
-    // uart_debug_print(buffer);
-    // #endif
-
-
-    // // Red Zone 앞부분 설정 (MPU 영역 0)
-    // MPU_ConfigureRegion(MPU_REGION_NUMBER0, MPU_REGION_DISABLE, front_addr - REDZONE_SIZE/2, REDZONE_SIZE/2, MPU_REGION_ALL_RO);  // Red Zone 앞쪽 설정  
-
-    // // Red Zone 뒷부분 설정 (MPU 영역 1)
-    // MPU_ConfigureRegion(MPU_REGION_NUMBER1, MPU_REGION_DISABLE, back_addr, REDZONE_SIZE/2, MPU_REGION_ALL_RO); // Red Zone 뒤쪽 설정
-
-    // HAL_MPU_EnableRegion(MPU_REGION_NUMBER0);
-    // HAL_MPU_EnableRegion(MPU_REGION_NUMBER1);
-  
-    // HAL_MPU_Enable(MPU_HFNMI_PRIVDEF);
+    /* MPU 재활성화 — Region 2~7 이 다시 보호를 시작한다 */
+    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 }
 
 void configure_mpu_redzone_for_heap_access(void* ptr){

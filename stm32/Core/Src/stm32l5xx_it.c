@@ -57,35 +57,43 @@ static void test_recovery_fn(void) {
     longjmp(g_test_recovery, 1);
 }
 
-/* C body of the handler – receives the exception frame pointer */
-void MemManage_Handler_C(uint32_t *frame) {
-    if (!g_test_running) {
-        while (1);   /* no test active → hard hang */
-    }
-
+/*
+ * Shared recovery body used by both MemManage and HardFault handlers.
+ * Clears fault status registers, resets all dynamic MPU regions, then
+ * redirects the exception return to test_recovery_fn so that longjmp
+ * resumes the test loop without re-faulting.
+ *
+ * Exception frame layout (basic Cortex-M frame on MSP):
+ *   [0]=R0 [1]=R1 [2]=R2 [3]=R3 [4]=R12 [5]=LR [6]=PC [7]=xPSR
+ */
+static void fault_recover_body(uint32_t *frame) {
     g_error_detected = 1;
 
-    /* Clear MemManage fault status bits */
+    /* Clear HardFault status (harmless when called from MemManage) */
+    SCB->HFSR = SCB->HFSR;
+    /* Clear all configurable fault status bits */
     SCB->CFSR = SCB->CFSR;
 
-    /* Disable all dynamic MPU regions (0–6) to prevent re-faulting */
     HAL_MPU_Disable();
     for (int i = 0; i < 7; i++) {
-        MPU_RNR  = (uint32_t)i;
+        MPU_RNR      = (uint32_t)i;
         MPU_RLAR_REG &= ~0x1UL;
     }
     HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT_IT);
 
-    /*
-     * Redirect exception return to test_recovery_fn by overwriting the
-     * stacked PC (frame[6] in the basic Cortex-M exception frame):
-     *   frame[0]=R0, [1]=R1, [2]=R2, [3]=R3,
-     *   frame[4]=R12, [5]=LR, [6]=PC, [7]=xPSR
-     *
-     * Also clear ICI/IT bits in xPSR to avoid INVSTATE fault on return.
-     */
+    /* Overwrite stacked PC; clear ICI/IT bits in xPSR to avoid INVSTATE */
     frame[6] = (uint32_t)test_recovery_fn;
     frame[7] = (frame[7] | 0x01000000U) & ~0x0600FC00U;
+}
+
+void MemManage_Handler_C(uint32_t *frame) {
+    if (!g_test_running) { while (1); }
+    fault_recover_body(frame);
+}
+
+void HardFault_Handler_C(uint32_t *frame) {
+    if (!g_test_running) { while (1); }
+    fault_recover_body(frame);
 }
 /* USER CODE END 0 */
 
@@ -125,17 +133,20 @@ void NMI_Handler(void)
 
 /**
   * @brief This function handles Hard fault interrupt.
+  *
+  * Naked wrapper identical in structure to MemManage_Handler: captures MSP,
+  * then calls HardFault_Handler_C which clears HFSR/CFSR, resets the MPU,
+  * and redirects the stacked PC to test_recovery_fn so longjmp resumes the
+  * test loop.  If no test is running the C handler hangs as before.
   */
-void HardFault_Handler(void)
-{
-  /* USER CODE BEGIN HardFault_IRQn 0 */
-
-  /* USER CODE END HardFault_IRQn 0 */
-  while (1)
-  {
-    /* USER CODE BEGIN W1_HardFault_IRQn 0 */
-    /* USER CODE END W1_HardFault_IRQn 0 */
-  }
+__attribute__((naked)) void HardFault_Handler(void) {
+    __asm volatile(
+        ".syntax unified          \n"
+        "mrs  r0, msp             \n"  /* r0 = exception frame pointer    */
+        "push {lr}                \n"  /* save EXC_RETURN                 */
+        "bl   HardFault_Handler_C \n"  /* call C body                     */
+        "pop  {pc}                \n"  /* EXC_RETURN → exception return   */
+    );
 }
 
 /**
@@ -160,31 +171,27 @@ __attribute__((naked)) void MemManage_Handler(void) {
 /**
   * @brief This function handles Prefetch fault, memory access fault.
   */
-void BusFault_Handler(void)
-{
-  /* USER CODE BEGIN BusFault_IRQn 0 */
-
-  /* USER CODE END BusFault_IRQn 0 */
-  while (1)
-  {
-    /* USER CODE BEGIN W1_BusFault_IRQn 0 */
-    /* USER CODE END W1_BusFault_IRQn 0 */
-  }
+__attribute__((naked)) void BusFault_Handler(void) {
+    __asm volatile(
+        ".syntax unified           \n"
+        "mrs  r0, msp              \n"
+        "push {lr}                 \n"
+        "bl   HardFault_Handler_C  \n"
+        "pop  {pc}                 \n"
+    );
 }
 
 /**
   * @brief This function handles Undefined instruction or illegal state.
   */
-void UsageFault_Handler(void)
-{
-  /* USER CODE BEGIN UsageFault_IRQn 0 */
-
-  /* USER CODE END UsageFault_IRQn 0 */
-  while (1)
-  {
-    /* USER CODE BEGIN W1_UsageFault_IRQn 0 */
-    /* USER CODE END W1_UsageFault_IRQn 0 */
-  }
+__attribute__((naked)) void UsageFault_Handler(void) {
+    __asm volatile(
+        ".syntax unified           \n"
+        "mrs  r0, msp              \n"
+        "push {lr}                 \n"
+        "bl   HardFault_Handler_C  \n"
+        "pop  {pc}                 \n"
+    );
 }
 
 /**

@@ -185,25 +185,42 @@ uint8_t compare_tag(void* addr1, void* addr2) {
     
     char buffer[100];
 
-    // 각 주소의 태그 가져오기
     uint8_t* tag1 = get_tag_address(addr1);
     uint8_t* tag2 = get_tag_address(addr2);
 
-    // 태그 값 비교
-    if (*tag1 == *tag2) {
+    /* addr1/addr2가 tracked RAM 범위 밖이면 get_tag_address가 0을 반환한다.
+     * 역참조 전에 반드시 확인해야 한다. */
+    if (!tag1 || !tag2) {
+        return TRUE;
+    }
+
+    /* 해제된 메모리 접근 탐지 (UAF).
+     * remove_tag()가 freed 영역을 UNPOISON_TAG(0xFD)로 마킹하므로
+     * 0xFD가 보이면 해제 후 접근이다. */
+    if (*tag1 == UNPOISON_TAG || *tag2 == UNPOISON_TAG) {
         #ifdef DEBUG
-        snprintf(buffer, sizeof(buffer), "Tags match for addresses:  from: %p, to: %p", addr1, addr2);
+        snprintf(buffer, sizeof(buffer), "UAF detected: from: %p(%u), to: %p(%u)", addr1, *tag1, addr2, *tag2);
         uart_debug_print(buffer);
         #endif
-        return TRUE;
-    } else {
+        handle_tag_mismatch(addr1, addr2);
+        return FALSE;
+    }
+
+    /* 버퍼 경계 초과 탐지 — 두 주소의 태그가 다르면 객체 경계를 넘었다. */
+    if (*tag1 != *tag2) {
         #ifdef DEBUG
         snprintf(buffer, sizeof(buffer), "Tags mismatch for addresses:  from: %p(%u), to: %p(%u)", addr1, *tag1, addr2, *tag2);
         uart_debug_print(buffer);
         #endif
         handle_tag_mismatch(addr1, addr2);
-        return FALSE; // Todo: mismatch 시 오류 처리할 핸들러 생성
+        return FALSE;
     }
+
+    #ifdef DEBUG
+    snprintf(buffer, sizeof(buffer), "Tags match for addresses:  from: %p, to: %p", addr1, addr2);
+    uart_debug_print(buffer);
+    #endif
+    return TRUE;
 }
 /* Clear entire tag memory region – called by test runner between test cases */
 void tags_reset(void) {
