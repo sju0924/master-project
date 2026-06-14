@@ -397,8 +397,11 @@ PreservedAnalyses GlobalVariableMPUPass::run(Module &M, ModuleAnalysisManager &A
     Value *runtimeBodyPtr =nullptr;
     Value *runtimeBodySize = nullptr;
     for (auto &F : M.functions()) {
-        lastGlobalVariable = nullptr;
-        for (auto &BB : F) {                
+        for (auto &BB : F) {
+            /* BB 단위로 리셋: fault_recover_body가 MPU 전체를 초기화한 뒤
+             * 동일 전역 변수에 재접근할 때 MPU가 재구성되도록 보장.
+             * 기존 per-function 리셋은 같은 함수 내 연속 BB에서 재구성을 건너뛰는 버그가 있었다. */
+            lastGlobalVariable = nullptr;
                 for (auto &I : BB) {
                     // load 명령어에서 전역 변수 접근 탐지
                     if (auto *LI = dyn_cast<LoadInst>(&I)) {

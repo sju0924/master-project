@@ -24,12 +24,41 @@ static uint32_t dwt_elapsed_us(uint32_t start) {
     return (DWT_CYCCNT - start) / (SystemCoreClock / 1000000U);
 }
 
+/* ── stack canary ────────────────────────────────────────────────────── */
+/* 테스트 함수 실행 전 SP 아래 영역을 0xCC로 채우고, 실행 후 스캔하여
+ * 최대 스택 사용량을 바이트 단위로 반환한다.
+ * CANARY_MARGIN: 루프 프레임/setjmp 자체가 쓰는 예약 영역 */
+#define STACK_CANARY_SIZE   1536U
+#define STACK_CANARY_FILL   0xCCU
+#define STACK_CANARY_MARGIN  128U
+
+static uint8_t *s_canary_base = NULL;
+
+__attribute__((noinline))
+static void stack_canary_arm(void) {
+    register uint32_t sp __asm("sp");
+    s_canary_base = (uint8_t *)(sp - STACK_CANARY_MARGIN - STACK_CANARY_SIZE);
+    for (uint32_t i = 0; i < STACK_CANARY_SIZE; i++)
+        s_canary_base[i] = STACK_CANARY_FILL;
+}
+
+static uint32_t stack_canary_measure(void) {
+    if (!s_canary_base) return 0;
+    /* 아래(낮은 주소)부터 위로 스캔 — 첫 더럽혀진 바이트가 최대 깊이 */
+    for (uint32_t i = 0; i < STACK_CANARY_SIZE; i++) {
+        if (s_canary_base[i] != STACK_CANARY_FILL)
+            return STACK_CANARY_SIZE - i;   /* 사용된 바이트 */
+    }
+    return 0;
+}
+
 /* ── state reset between test cases ─────────────────────────────────── */
 extern void HAL_MPU_Disable(void);
 extern void HAL_MPU_Enable(uint32_t MPU_Control);
 extern void configure_mpu_for_null_ptr(void);
 extern void heap_reset(void);
 extern void tags_reset(void);
+extern size_t heap_get_peak(void);
 
 #define MPU_RNR                (*(volatile uint32_t *)0xE000ED98)
 #define MPU_RLAR               (*(volatile uint32_t *)0xE000EDA0)
@@ -48166,11 +48195,14 @@ void run_all_tests(void) {
         reset_test_state();
         g_error_detected = 0;
         g_test_running   = 1;
+        stack_canary_arm();
         uint32_t t0 = DWT_CYCCNT;
         if (setjmp(g_test_recovery) == 0) {
             tc->bad();
         }
-        uint32_t t_bad_us = dwt_elapsed_us(t0);
+        uint32_t t_bad_us  = dwt_elapsed_us(t0);
+        uint32_t bad_heap  = (uint32_t)heap_get_peak();
+        uint32_t bad_stk   = stack_canary_measure();
         int bad_caught = g_error_detected;
         g_test_running = 0;
 
@@ -48178,11 +48210,14 @@ void run_all_tests(void) {
         reset_test_state();
         g_error_detected = 0;
         g_test_running   = 1;
+        stack_canary_arm();
         t0 = DWT_CYCCNT;
         if (setjmp(g_test_recovery) == 0) {
             tc->good();
         }
         uint32_t t_good_us = dwt_elapsed_us(t0);
+        uint32_t good_heap = (uint32_t)heap_get_peak();
+        uint32_t good_stk  = stack_canary_measure();
         int good_fp = g_error_detected;
         g_test_running = 0;
 
@@ -48194,10 +48229,19 @@ void run_all_tests(void) {
 
         snprintf(buf, sizeof(buf),
                  "[%s] %s\r\n"
-                 "         bad: %6lu us  good: %6lu us\r\n",
+                 "  bad:  %6lu us  heap:%5luB  stk:%5luB\r\n"
+                 "  good: %6lu us  heap:%5luB  stk:%5luB\r\n",
                  verdict, tc->name,
-                 (unsigned long)t_bad_us,
-                 (unsigned long)t_good_us);
+                 (unsigned long)t_bad_us,  (unsigned long)bad_heap,  (unsigned long)bad_stk,
+                 (unsigned long)t_good_us, (unsigned long)good_heap, (unsigned long)good_stk);
+        uart_send_string(buf);
+
+        /* 파싱용 구조화 출력 */
+        snprintf(buf, sizeof(buf),
+                 "[METRIC] bad_us=%lu good_us=%lu bad_heap=%lu good_heap=%lu bad_stk=%lu good_stk=%lu\r\n",
+                 (unsigned long)t_bad_us,  (unsigned long)t_good_us,
+                 (unsigned long)bad_heap,  (unsigned long)good_heap,
+                 (unsigned long)bad_stk,   (unsigned long)good_stk);
         uart_send_string(buf);
     }
 

@@ -13,6 +13,13 @@ mkdir -p "$OUTPUT_DIR"
 # ── 헬퍼 함수 ──────────────────────────────────────────────────────────
 run_passes() {
     local app_ll="$1"
+
+    if [ "${NO_PASS:-0}" = "1" ]; then
+        echo "    [pass] SKIP (NO_PASS=1)"
+        cp "$app_ll" "$BUILD_DIR/application_output.ll"
+        return
+    fi
+
     echo "    [pass 1/4] struct/global-tag..."
     opt-18 --load-pass-plugin="$PASS_DIR/libTagPass.so" \
         -passes="struct-metadata-pass,global-variable-tag-pass" \
@@ -37,9 +44,10 @@ run_passes() {
 
 link_and_compile() {
     local label="$1"
+    local drivers_ll="${2:-$BUILD_DIR/drivers_analysed.ll}"
 
     echo "    [link] output.ll..."
-    llvm-link-18 "$BUILD_DIR/application_output.ll" "$BUILD_DIR/drivers_analysed.ll" \
+    llvm-link-18 "$BUILD_DIR/application_output.ll" "$drivers_ll" \
         -o "$BUILD_DIR/output.ll"
 
     echo "    [llc] output.o..."
@@ -87,11 +95,17 @@ link_and_compile() {
 # ── 1회성 준비 ────────────────────────────────────────────────────────
 cd "$BUILD_DIR"
 
-if [ ! -f drivers_analysed.ll ] || [ "$STM32_DIR/drivers.ll" -nt drivers_analysed.ll ]; then
-    echo "==> Generating drivers_analysed.ll (one-time)..."
-    opt-18 --load-pass-plugin="$PASS_DIR/libMPUPass.so" \
-        -passes="null-ptr-mpu-pass" \
-        "$STM32_DIR/drivers.ll" -o drivers_analysed.ll 2>/dev/null
+if [ "${NO_PASS:-0}" = "1" ]; then
+    DRIVERS_LL="$STM32_DIR/drivers.ll"
+    echo "==> NO_PASS 모드: drivers.ll 원본 사용"
+else
+    if [ ! -f drivers_analysed.ll ] || [ "$STM32_DIR/drivers.ll" -nt drivers_analysed.ll ]; then
+        echo "==> Generating drivers_analysed.ll (one-time)..."
+        opt-18 --load-pass-plugin="$PASS_DIR/libMPUPass.so" \
+            -passes="null-ptr-mpu-pass" \
+            "$STM32_DIR/drivers.ll" -o drivers_analysed.ll 2>/dev/null
+    fi
+    DRIVERS_LL="$BUILD_DIR/drivers_analysed.ll"
 fi
 
 if [ ! -f startup.o ]; then
@@ -145,6 +159,7 @@ for target in "${TARGETS[@]}"; do
 
     label="${cwe_name}"
     [ -n "$subdir" ] && label="${cwe_name}_${subdir}"
+    [ "${NO_PASS:-0}" = "1" ] && label="${label}_nopass"
 
     echo "========================================"
     echo "  [$idx/${#TARGETS[@]}] $label"
@@ -181,7 +196,7 @@ for target in "${TARGETS[@]}"; do
 
     # 4. link & compile
     echo "  [4] 링크 및 컴파일..."
-    link_and_compile "$label"
+    link_and_compile "$label" "$DRIVERS_LL"
 
     echo ""
 done

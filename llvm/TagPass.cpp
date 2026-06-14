@@ -184,120 +184,39 @@ PreservedAnalyses GlobalVariableTagPass::run(Module &M, ModuleAnalysisManager &A
 
 // Function을 받아서 분석하는 run 메서드
 PreservedAnalyses PointerArithmeticPass::run(Function &F, FunctionAnalysisManager &AM) {
-    // LoopInfo를 가져오기 위해 FunctionAnalysisManager에서 분석 정보 획득
-    auto &LI = AM.getResult<LoopAnalysis>(F);
     Module *M = F.getParent();
     IRBuilder<> Builder(F.getContext());
     bool Modified = false;
 
-    // 외부 compare_tag 함수 정의 (void* 형식의 두 인자를 받음)
     FunctionCallee CompareTagFunc = M->getOrInsertFunction(
-        "compare_tag", 
-        FunctionType::get(Type::getInt8Ty(F.getContext()), 
-                            {PointerType::get(Type::getInt8Ty(M->getContext()), 0), 
-                            PointerType::get(Type::getInt8Ty(M->getContext()), 0)}, 
-                            false)
+        "compare_tag",
+        FunctionType::get(Type::getInt8Ty(F.getContext()),
+                          {PointerType::get(Type::getInt8Ty(M->getContext()), 0),
+                           PointerType::get(Type::getInt8Ty(M->getContext()), 0)},
+                          false)
     );
 
+    /* 루프/비루프 구분 없이 모든 GEP에 대해 GEP 직후에 compare_tag 삽입.
+     * 기존 루프 전용 경로는 ExitBlock predecessor에서 GEP를 찾으려 했으나,
+     * GEP가 루프 바디 BB에만 존재하고 다른 predecessor에는 없어 항상
+     * validForAllPredecessors=false → compare_tag 미삽입 버그가 있었다. */
     for (auto &BB : F) {
-        // 현재 블록이 반복문에 포함되어 있는지 확인
-        Loop *L = LI.getLoopFor(&BB);
-        
-if (L) {
-    // 반복문 내에서 첫 번째 및 마지막 접근 요소를 추적
-    std::map<Value *, std::pair<GetElementPtrInst *, GetElementPtrInst *>> AccessMap; // 포인터 -> (첫 번째 GEP, 마지막 GEP)
-
-    // 반복문 종료 블록 찾기
-    SmallVector<BasicBlock *, 4> ExitBlocks;
-    L->getExitBlocks(ExitBlocks);
-
-    // 반복문 내에서 GEP 연산 추적
-    for (auto &I : BB) {
-        if (auto *GEP = dyn_cast<GetElementPtrInst>(&I)) {
-            Value *BasePointer = GEP->getPointerOperand(); // GEP의 기준 포인터
-
-            // AccessMap에서 해당 포인터를 검색
-            auto &AccessPair = AccessMap[BasePointer];
-            if (!AccessPair.first) {
-                AccessPair.first = GEP; // 첫 번째 접근
-                errs() << "First access for pointer " << *BasePointer << ": " << *GEP << "\n";
-            }
-            AccessPair.second = GEP; // 마지막 접근 (매번 갱신)
-        }
-    }
-
-    // 각 Exit 블록에 대해 처리
-    for (BasicBlock *ExitBlock : ExitBlocks) {
-        IRBuilder<> Builder(&(*ExitBlock->getFirstInsertionPt())); // ExitBlock의 시작 지점 설정
-
-        for (const auto &Entry : AccessMap) {
-            Value *BasePointer = Entry.first;
-            GetElementPtrInst *FirstAccess = Entry.second.first;
-            GetElementPtrInst *LastAccess = Entry.second.second;
-
-            if (FirstAccess && LastAccess) {
-                bool validForAllPredecessors = true; // 모든 선행 블록에서 정의된 값을 확인하기 위한 플래그
-
-                // 선행 블록 탐색
-                for (auto *Pred : predecessors(ExitBlock)) {
-                    Value *FirstGEP = nullptr;
-                    Value *LastGEP = nullptr;
-
-                    // 선행 블록 내의 명령어들을 순회하면서 GEP 명령어가 있는지 확인
-                    for (auto &I : *Pred) {
-                        if (auto *GEP = dyn_cast<GetElementPtrInst>(&I)) {
-                            if (GEP == FirstAccess) {
-                                FirstGEP = GEP;
-                            }
-                            if (GEP == LastAccess) {
-                                LastGEP = GEP;
-                            }
-                        }
-                    }
-
-                    // GEP 명령어가 없는 경우, 해당 블록에 대해 compare_tag를 수행하지 않도록 설정
-                    if (!FirstGEP || !LastGEP) {
-                        validForAllPredecessors = false;
-                        errs() << "Skipping compare_tag for Exit block: " << ExitBlock->getName()
-                               << " due to missing GEP in predecessor: " << Pred->getName() << "\n";
-                        break;
-                    }
-                }
-
-                // 모든 선행 블록에서 GEP 명령어가 유효하게 정의된 경우에만 compare_tag 호출
-                if (validForAllPredecessors) {
-                    Value *FirstCast = Builder.CreateBitCast(FirstAccess, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
-                    Value *LastCast = Builder.CreateBitCast(LastAccess, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
-
-                    // compare_tag 호출
-                    Builder.CreateCall(CompareTagFunc, {FirstCast, LastCast});
-                    errs() << "compare_tag inserted for pointer: " << *BasePointer << " at block: " << ExitBlock->getName() << "\n";
-                }
-            }
-        }
-
-        Modified = true;
-    }
-}
-
-        else {
-            // 반복문 외부의 모든 GEP 감지
-            for (auto &I : BB) {
-                if (auto *GEP = dyn_cast<GetElementPtrInst>(&I)) {
-                    Builder.SetInsertPoint(GEP->getNextNode());
-                    Value *Addr1 = GEP->getPointerOperand();
-                    Value *Addr2 = GEP;
-                    auto *CastAddr1 = Builder.CreateBitCast(Addr1, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
-                    auto *CastAddr2 = Builder.CreateBitCast(Addr2, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
-                    Builder.CreateCall(CompareTagFunc, {CastAddr1, CastAddr2});
-
-                    errs() << "GEP outside loop detected: " << *GEP << "\n";
-                    Modified = true;;
-                }
+        for (auto &I : BB) {
+            if (auto *GEP = dyn_cast<GetElementPtrInst>(&I)) {
+                Builder.SetInsertPoint(GEP->getNextNode());
+                Value *Addr1 = GEP->getPointerOperand();
+                Value *Addr2 = GEP;
+                auto *CastAddr1 = Builder.CreateBitCast(
+                    Addr1, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
+                auto *CastAddr2 = Builder.CreateBitCast(
+                    Addr2, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
+                Builder.CreateCall(CompareTagFunc, {CastAddr1, CastAddr2});
+                errs() << "compare_tag inserted after GEP: " << *GEP << "\n";
+                Modified = true;
             }
         }
     }
-    
+
     return (Modified ? PreservedAnalyses::none() : PreservedAnalyses::all());
 }
 

@@ -20,3 +20,5 @@ void MPU_ConfigureRegion(uint32_t region_num, uint32_t enable, uint32_t base_add
 
 /* Free all outstanding my_malloc allocations (for test-case recovery) */
 void heap_reset(void);
+/* Peak heap bytes allocated since last heap_reset() */
+size_t heap_get_peak(void);

@@ -7,12 +7,19 @@ static void *heap_track_raw[MAX_HEAP_ALLOCS];  /* raw ptr from malloc() */
 static void *heap_track_ptr[MAX_HEAP_ALLOCS];  /* aligned user ptr      */
 static int   heap_track_count = 0;
 
+static size_t s_heap_live = 0;  /* bytes currently allocated */
+static size_t s_heap_peak = 0;  /* peak bytes since last reset */
+
+size_t heap_get_peak(void) { return s_heap_peak; }
+
 /* Free all outstanding allocations – called by test runner after each case */
 void heap_reset(void) {
     while (heap_track_count > 0) {
         heap_track_count--;
         free(heap_track_raw[heap_track_count]);
     }
+    s_heap_live = 0;
+    s_heap_peak = 0;
 }
 
 void* my_malloc(size_t size) {
@@ -70,6 +77,10 @@ void* my_malloc(size_t size) {
     // 태그 설정
     // 우선 전체 할당 범위에만 태그 부여
     set_tag((void*)aligned_ptr, size);
+
+    /* 워터마크 갱신 */
+    s_heap_live += size;
+    if (s_heap_live > s_heap_peak) s_heap_peak = s_heap_live;
 
     // 할당 추적 등록
     if (heap_track_count < MAX_HEAP_ALLOCS) {
@@ -145,8 +156,11 @@ void my_free(void* ptr) {
     }
     
 
+    /* 워터마크 감소 */
+    if (s_heap_live >= metadata->size) s_heap_live -= metadata->size;
+    else s_heap_live = 0;
+
     // 태그 삭제
-    
     remove_tag((void*)start_address,end_address-start_address);
 
     //double-free 확인
