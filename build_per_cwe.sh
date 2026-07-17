@@ -92,7 +92,49 @@ link_and_compile() {
     fi
 }
 
+rebuild_runtime() {
+    local runtime_build="$BUILD_DIR/runtime/CMakeFiles/runtime.dir"
+    local runtime_sources=(
+        testPrint.c
+        MPU.c
+        debugger.c
+        tagManager.c
+        heapManager.c
+        intrinsicFunction.c
+        syscalls.c
+    )
+    local runtime_objects=()
+
+    mkdir -p "$runtime_build" "$BUILD_DIR/runtime"
+
+    for src in "${runtime_sources[@]}"; do
+        local obj="$runtime_build/${src}.o"
+        arm-none-eabi-gcc -c \
+            -mcpu=cortex-m33 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -specs=nano.specs \
+            -DUSE_FULL_LL_DRIVER -DUSE_HAL_DRIVER -DSTM32L562xx \
+            -I"$PROJ_ROOT/runtime" \
+            -I"$PROJ_ROOT/stm32/Core/Inc" \
+            -I"$PROJ_ROOT/stm32/Drivers/STM32L5xx_HAL_Driver/Inc" \
+            -I"$PROJ_ROOT/stm32/Drivers/STM32L5xx_HAL_Driver/Inc/Legacy" \
+            -I"$PROJ_ROOT/stm32/Drivers/CMSIS/Device/ST/STM32L5xx/Include" \
+            -I"$PROJ_ROOT/stm32/Drivers/CMSIS/Include" \
+            "$PROJ_ROOT/runtime/$src" \
+            -o "$obj"
+        runtime_objects+=("$obj")
+    done
+
+    arm-none-eabi-ld -r "${runtime_objects[@]}" -o "$BUILD_DIR/runtime/runtime.o"
+}
+
 # ── 1회성 준비 ────────────────────────────────────────────────────────
+# Keep the shared driver IR in sync with the STM32 sources.  Per-CWE builds
+# previously rebuilt only application.ll, so changes to exception handlers
+# (including HardFault recovery) could be silently omitted from the firmware.
+echo "==> 공통 STM32 드라이버 IR 갱신..."
+make -C "$STM32_DIR" -j8 build/drivers.ll >/dev/null
+echo "==> Runtime object 갱신..."
+rebuild_runtime
+
 cd "$BUILD_DIR"
 
 if [ "${NO_PASS:-0}" = "1" ]; then

@@ -47,10 +47,6 @@
 
 /* USER CODE BEGIN 0 */
 extern void HAL_MPU_Disable(void);
-extern void HAL_MPU_Enable(uint32_t MPU_Control);
-#define MPU_RNR          (*(volatile uint32_t *)0xE000ED98)
-#define MPU_RLAR_REG     (*(volatile uint32_t *)0xE000EDA0)
-#define MPU_PRIVILEGED_DEFAULT_IT  4U
 
 /* Called after exception return redirects PC here */
 static void test_recovery_fn(void) {
@@ -59,14 +55,23 @@ static void test_recovery_fn(void) {
 
 /*
  * Shared recovery body used by both MemManage and HardFault handlers.
- * Clears fault status registers, resets all dynamic MPU regions, then
- * redirects the exception return to test_recovery_fn so that longjmp
- * resumes the test loop without re-faulting.
+ * Disables MPU enforcement, clears fault status registers, then redirects the
+ * exception return to test_recovery_fn so that longjmp resumes the test loop.
+ * The test runner resets/re-enables MPU regions after setjmp returns.
  *
- * Exception frame layout (basic Cortex-M frame on MSP):
+ * Exception frame layout (basic Cortex-M frame):
  *   [0]=R0 [1]=R1 [2]=R2 [3]=R3 [4]=R12 [5]=LR [6]=PC [7]=xPSR
+ *
+ * On ARMv8-M, EXC_RETURN bit 5 (FType) is clear when an extended FP frame
+ * (S0-S15, FPSCR, reserved: 18 words) precedes the basic frame.  The wrapper
+ * also passes EXC_RETURN so this function can locate the real stacked PC.
  */
-static void fault_recover_body(uint32_t *frame) {
+static void fault_recover_body(uint32_t *frame, uint32_t exc_return) {
+    if ((exc_return & (1UL << 5)) == 0U) {
+        frame += 18;
+    }
+
+    HAL_MPU_Disable();
     g_error_detected = 1;
 
     /* Clear HardFault status (harmless when called from MemManage) */
@@ -74,26 +79,21 @@ static void fault_recover_body(uint32_t *frame) {
     /* Clear all configurable fault status bits */
     SCB->CFSR = SCB->CFSR;
 
-    HAL_MPU_Disable();
-    for (int i = 0; i < 7; i++) {
-        MPU_RNR      = (uint32_t)i;
-        MPU_RLAR_REG &= ~0x1UL;
-    }
-    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT_IT);
-
     /* Overwrite stacked PC; clear ICI/IT bits in xPSR to avoid INVSTATE */
     frame[6] = (uint32_t)test_recovery_fn;
     frame[7] = (frame[7] | 0x01000000U) & ~0x0600FC00U;
 }
 
-void MemManage_Handler_C(uint32_t *frame) {
+void MemManage_Handler_C(uint32_t *frame, uint32_t exc_return) {
+    HAL_MPU_Disable();
     if (!g_test_running) { while (1); }
-    fault_recover_body(frame);
+    fault_recover_body(frame, exc_return);
 }
 
-void HardFault_Handler_C(uint32_t *frame) {
+void HardFault_Handler_C(uint32_t *frame, uint32_t exc_return) {
+    HAL_MPU_Disable();
     if (!g_test_running) { while (1); }
-    fault_recover_body(frame);
+    fault_recover_body(frame, exc_return);
 }
 /* USER CODE END 0 */
 
@@ -142,7 +142,11 @@ void NMI_Handler(void)
 __attribute__((naked)) void HardFault_Handler(void) {
     __asm volatile(
         ".syntax unified          \n"
-        "mrs  r0, msp             \n"  /* r0 = exception frame pointer    */
+        "tst  lr, #4              \n"
+        "ite  eq                  \n"
+        "mrseq r0, msp            \n"
+        "mrsne r0, psp            \n"
+        "mov  r1, lr              \n"  /* EXC_RETURN: stack + frame type  */
         "push {lr}                \n"  /* save EXC_RETURN                 */
         "bl   HardFault_Handler_C \n"  /* call C body                     */
         "pop  {pc}                \n"  /* EXC_RETURN → exception return   */
@@ -161,7 +165,11 @@ __attribute__((naked)) void HardFault_Handler(void) {
 __attribute__((naked)) void MemManage_Handler(void) {
     __asm volatile(
         ".syntax unified        \n"
-        "mrs  r0, msp           \n"  /* r0 = start of exception frame   */
+        "tst  lr, #4            \n"
+        "ite  eq                \n"
+        "mrseq r0, msp          \n"
+        "mrsne r0, psp          \n"
+        "mov  r1, lr            \n"
         "push {lr}              \n"  /* save EXC_RETURN                  */
         "bl   MemManage_Handler_C\n" /* call C body with frame ptr in r0 */
         "pop  {pc}              \n"  /* EXC_RETURN → triggers exception return */
@@ -174,7 +182,11 @@ __attribute__((naked)) void MemManage_Handler(void) {
 __attribute__((naked)) void BusFault_Handler(void) {
     __asm volatile(
         ".syntax unified           \n"
-        "mrs  r0, msp              \n"
+        "tst  lr, #4               \n"
+        "ite  eq                   \n"
+        "mrseq r0, msp             \n"
+        "mrsne r0, psp             \n"
+        "mov  r1, lr               \n"
         "push {lr}                 \n"
         "bl   HardFault_Handler_C  \n"
         "pop  {pc}                 \n"
@@ -187,7 +199,11 @@ __attribute__((naked)) void BusFault_Handler(void) {
 __attribute__((naked)) void UsageFault_Handler(void) {
     __asm volatile(
         ".syntax unified           \n"
-        "mrs  r0, msp              \n"
+        "tst  lr, #4               \n"
+        "ite  eq                   \n"
+        "mrseq r0, msp             \n"
+        "mrsne r0, psp             \n"
+        "mov  r1, lr               \n"
         "push {lr}                 \n"
         "bl   HardFault_Handler_C  \n"
         "pop  {pc}                 \n"

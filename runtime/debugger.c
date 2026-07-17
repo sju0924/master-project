@@ -8,6 +8,7 @@ void sd_card_write(const char *message);
 extern jmp_buf      g_test_recovery;
 extern volatile int g_test_running;
 extern volatile int g_error_detected;
+extern void HAL_MPU_Disable(void);
 
 // 외부에 정의된 compare_tag 함수 선언
 uint8_t* get_tag_address(void *address);
@@ -122,6 +123,7 @@ void handle_tag_mismatch(void* start, void* end) {
 
     // 테스트 러너 실행 중이면 예외 대신 복구 경로로 점프
     if (g_test_running) {
+        HAL_MPU_Disable();
         g_error_detected = 1;
         longjmp(g_test_recovery, 2);
     }

@@ -212,6 +212,7 @@ void run_all_tests(void) {{
         if (setjmp(g_test_recovery) == 0) {{
             tc->bad();
         }}
+        reset_mpu();
         uint32_t t_bad_us = dwt_elapsed_us(t0);
         int bad_caught = g_error_detected;
         g_test_running = 0;
@@ -224,6 +225,7 @@ void run_all_tests(void) {{
         if (setjmp(g_test_recovery) == 0) {{
             tc->good();
         }}
+        reset_mpu();
         uint32_t t_good_us = dwt_elapsed_us(t0);
         int good_fp = g_error_detected;
         g_test_running = 0;
