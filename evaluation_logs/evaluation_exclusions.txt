@@ -1,0 +1,5 @@
+# Reproducibility and detector-granularity exclusions.
+_rand_
+CWE129_
+CWE193_
+sizeof_(double|int64_t|struct)_

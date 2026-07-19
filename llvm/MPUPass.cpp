@@ -2,10 +2,18 @@
 
 PreservedAnalyses StackMPUPass::run(Function &F,
                                       FunctionAnalysisManager &AM) {
-  
 
-    
-    if (F.getName() == "configure_mpu_redzone_for_call" || F.getName() == "configure_mpu_redzone_for_return" || F.getName()=="__global_var_init" || F.getName()=="set_tag" || F.getName()=="my_malloc" || F.getName()=="my_free" ) {
+
+    StringRef Name = F.getName();
+    if (Name == "configure_mpu_redzone_for_call" ||
+        Name == "configure_mpu_redzone_for_return" ||
+        Name == "__global_var_init" ||
+        Name == "set_tag" ||
+        Name == "compare_tag" ||
+        Name == "check_live_tag" ||
+        Name == "check_null_ptr" ||
+        Name == "handle_tag_mismatch" ||
+        Name.starts_with("my_")) {
         return PreservedAnalyses::none();
     }
     errs() << "Analyzing function: " << F.getName() << "\n";
@@ -67,6 +75,17 @@ PreservedAnalyses StackMPUPass::run(Function &F,
 
     for (auto &BB : F) {
         for (auto I = BB.begin(); I != BB.end(); ++I) {
+            if (AllocaInst *AI = dyn_cast<AllocaInst>(&*I)) {
+                if (!AI->isStaticAlloca()) {
+                    IRBuilder<> AllocaBuilder(AI->getNextNode());
+                    Value *CurrentSp = AllocaBuilder.CreateCall(AsmSp);
+                    Value *CurrentR7 = AllocaBuilder.CreateCall(AsmR7);
+                    AllocaBuilder.CreateCall(SubRSP);
+                    AllocaBuilder.CreateCall(configureMPURedzoneForCall, {CurrentSp, CurrentR7});
+                    AllocaBuilder.CreateCall(AddRSP);
+                }
+            }
+
             // CallInst를 통해 함수 호출 감지
             if (CallInst *CI = dyn_cast<CallInst>(&*I)) {
                 Function *calledFunc = CI->getCalledFunction();

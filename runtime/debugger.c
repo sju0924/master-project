@@ -1,4 +1,5 @@
 #include "runtimeConfig.h"
+#include "test_runner.h"
 #include <setjmp.h>
 
 // UART 및 SD 카드 인터페이스 함수 선언
@@ -9,6 +10,15 @@ extern jmp_buf      g_test_recovery;
 extern volatile int g_test_running;
 extern volatile int g_error_detected;
 extern void HAL_MPU_Disable(void);
+
+#define DWT_CYCCNT (*(volatile uint32_t *)0xE0001004)
+
+static void record_software_detection(DetectionSource source) {
+    if (g_detection_source == DETECTION_NONE) {
+        g_detection_source = source;
+        g_detection_cycles = DWT_CYCCNT - g_detection_start_cycle;
+    }
+}
 
 // 외부에 정의된 compare_tag 함수 선언
 uint8_t* get_tag_address(void *address);
@@ -103,6 +113,7 @@ void log_error(ErrorInfo* info) {
 
 // 태그 불일치 예외 감지 함수 (태그 불일치 발생 시 호출됨)
 void handle_tag_mismatch(void* start, void* end) {
+    record_software_detection(DETECTION_SOFTWARE_TAG);
     ErrorInfo info = {0};
     info.type = ERROR_TAG_MISMATCH;
     info.pc   = (uintptr_t)start;
@@ -122,6 +133,43 @@ void handle_tag_mismatch(void* start, void* end) {
     log_error(&info);
 
     // 테스트 러너 실행 중이면 예외 대신 복구 경로로 점프
+    if (g_test_running) {
+        HAL_MPU_Disable();
+        g_error_detected = 1;
+        longjmp(g_test_recovery, 2);
+    }
+
+    while (1);
+}
+
+void check_null_ptr(void *address) {
+    if (address != NULL) {
+        return;
+    }
+
+    record_software_detection(DETECTION_NULL);
+    ErrorInfo info = {0};
+    info.type = ERROR_NULL_PTR;
+    info.pc = 0x00000000;
+    info.lr = 0x00000000;
+    info.fault_address = 0x00000000;
+    info.cfsr = 0x00000000;
+    info.mpu_region = 0U;
+
+    log_error(&info);
+
+    if (g_test_running) {
+        HAL_MPU_Disable();
+        g_error_detected = 1;
+        longjmp(g_test_recovery, 2);
+    }
+
+    while (1);
+}
+
+void report_integer_underflow(void) {
+    record_software_detection(DETECTION_INTEGER);
+
     if (g_test_running) {
         HAL_MPU_Disable();
         g_error_detected = 1;

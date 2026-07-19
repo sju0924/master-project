@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <wchar.h>
 #include <setjmp.h>
+#include <stdarg.h>
 
 extern uint8_t compare_tag(void* addr1, void* addr2);
 
@@ -42,13 +43,17 @@ void* my_memcpy(void* dest, const void* src, size_t num) {
 
 char* my_strcpy(char* dest, const char* origin){
     size_t len = 0;
-    char *ptr = origin;
+    const char *ptr = origin;
     while(*ptr++ != '\0'){
         len++;
     }
 
     compare_tag(dest, dest+len);
-    return strcpy(dest, origin);
+
+    char *out = dest;
+    while ((*out++ = *origin++) != '\0') {
+    }
+    return dest;
 }
 
 // 커스텀 my_memmove 함수
@@ -77,7 +82,11 @@ void* my_memmove(void* dest, const void* src, size_t num) {
 wchar_t* my_wcscpy(wchar_t* dest, const wchar_t* src) {
     size_t len = wcslen(src);           /* null 제외 wchar_t 개수 */
     compare_tag(dest, dest + len);      /* dest[0] vs dest[len] (오버플로우 착지점) */
-    return wcscpy(dest, src);
+
+    wchar_t *out = dest;
+    while ((*out++ = *src++) != L'\0') {
+    }
+    return dest;
 }
 
 wchar_t* my_wcsncpy(wchar_t* dest, const wchar_t* src, size_t n) {
@@ -92,6 +101,26 @@ wchar_t* my_wcscat(wchar_t* dest, const wchar_t* src) {
     size_t src_len  = wcslen(src);
     compare_tag(dest, dest + dest_len + src_len);
     return wcscat(dest, src);
+}
+
+wchar_t* my_wcsncat(wchar_t* dest, const wchar_t* src, size_t n) {
+    size_t dest_len = wcslen(dest);
+    size_t src_len = wcslen(src);
+    size_t copy_len = src_len < n ? src_len : n;
+    compare_tag(dest, dest + dest_len + copy_len);
+    return wcsncat(dest, src, n);
+}
+
+int my_swprintf(wchar_t* dest, size_t n, const wchar_t* format, ...) {
+    if (n > 0) {
+        compare_tag(dest, dest + n - 1);
+    }
+
+    va_list args;
+    va_start(args, format);
+    int result = vswprintf(dest, n, format, args);
+    va_end(args);
+    return result;
 }
 
 wchar_t* my_wmemcpy(wchar_t* dest, const wchar_t* src, size_t n) {
@@ -129,8 +158,22 @@ char* my_strcat(char* dest, const char* src) {
 /* strncat writes at most n chars then a null terminator at dest[dest_len+n] */
 char* my_strncat(char* dest, const char* src, size_t n) {
     size_t dest_len = strlen(dest);
-    compare_tag((uint8_t*)dest, (uint8_t*)dest + dest_len + n);
+    size_t src_len = strlen(src);
+    size_t copy_len = src_len < n ? src_len : n;
+    compare_tag((uint8_t*)dest, (uint8_t*)dest + dest_len + copy_len);
     return strncat(dest, src, n);
+}
+
+int my_snprintf(char* dest, size_t n, const char* format, ...) {
+    if (n > 0) {
+        compare_tag((uint8_t*)dest, (uint8_t*)dest + n - 1);
+    }
+
+    va_list args;
+    va_start(args, format);
+    int result = vsnprintf(dest, n, format, args);
+    va_end(args);
+    return result;
 }
 
 /* ── exit interception ───────────────────────────────────────────────── */

@@ -1,4 +1,5 @@
 #include "TagPass.h"
+#include "llvm/ADT/SmallVector.h"
 
 //todo: 언제 태그 비교 함수를 집어넣느냐(중요)
 
@@ -81,8 +82,11 @@ PreservedAnalyses StackTagPass::run(Function &F, FunctionAnalysisManager &AM) {
     // 함수의 모든 기본 블록을 순회
     for (auto &BB : F) {
         for (auto &I : BB) {
-            if (AllocaInst *allocInst = dyn_cast<AllocaInst>(&I)) {                       
+            if (AllocaInst *allocInst = dyn_cast<AllocaInst>(&I)) {
 
+                if (allocInst->getAlign() < Align(8)) {
+                    allocInst->setAlignment(Align(8));
+                }
 
                 // 구조체일 경우 각 멤버별로 태그 할당
                 if (StructType* structType = isUserDefinedStruct(dyn_cast<StructType>(allocInst->getAllocatedType()))) {                    
@@ -90,14 +94,19 @@ PreservedAnalyses StackTagPass::run(Function &F, FunctionAnalysisManager &AM) {
                 }
                 else{
                     // 태그 설정 함수 호출을 IR에 삽입
-                    IRBuilder<> Builder(&I); 
+                    IRBuilder<> Builder(&I);
                     Builder.SetInsertPoint(I.getNextNode());
                     Value *Addr = Builder.CreateBitCast(allocInst, PointerType::get(Type::getInt8Ty(allocInst->getContext()), 0));
-                    Value *AllocSize = ConstantInt::get(Type::getInt32Ty(allocInst->getContext()), ((allocInst->getAllocationSizeInBits(F.getParent()->getDataLayout()))->getFixedValue()) / 8);
+                    uint64_t ElementSize = F.getParent()->getDataLayout().getTypeAllocSize(allocInst->getAllocatedType());
+                    Value *ArraySize = allocInst->getArraySize();
+                    Value *ArraySize32 = Builder.CreateIntCast(ArraySize, Type::getInt32Ty(allocInst->getContext()), false);
+                    Value *AllocSize = Builder.CreateMul(
+                        ArraySize32,
+                        ConstantInt::get(Type::getInt32Ty(allocInst->getContext()), ElementSize));
                     Builder.CreateCall(setTag, {Addr, AllocSize});
                 }
-                    
-                errs() << "Detect function local variable: "<<allocInst->getName()<<" size: "<<ConstantInt::get(Type::getInt64Ty(allocInst->getContext()), ((allocInst->getAllocationSizeInBits(F.getParent()->getDataLayout()))->getFixedValue()) / 8)<<"\n";
+
+                errs() << "Detect function local variable: "<<allocInst->getName()<<"\n";
                 Modified = true;
             }
         }
@@ -196,6 +205,64 @@ PreservedAnalyses PointerArithmeticPass::run(Function &F, FunctionAnalysisManage
                           false)
     );
 
+    FunctionCallee CheckLiveTagFunc = M->getOrInsertFunction(
+        "check_live_tag",
+        FunctionType::get(Type::getVoidTy(F.getContext()),
+                          {PointerType::get(Type::getInt8Ty(M->getContext()), 0)},
+                          false)
+    );
+
+    FunctionCallee CheckNullPtrFunc = M->getOrInsertFunction(
+        "check_null_ptr",
+        FunctionType::get(Type::getVoidTy(F.getContext()),
+                          {PointerType::get(Type::getInt8Ty(M->getContext()), 0)},
+                          false)
+    );
+
+    SmallVector<std::pair<CallBase *, unsigned>, 8> SinkArguments;
+    SmallVector<std::pair<Instruction *, Value *>, 16> NullChecks;
+
+    static const std::set<StringRef> PointerSinks = {
+        "printLine",
+        "printWLine",
+        "printStructLine",
+    };
+
+    for (auto &BB : F) {
+        for (auto &I : BB) {
+            if (F.getName().starts_with("CWE")) {
+                if (auto *GEP = dyn_cast<GetElementPtrInst>(&I)) {
+                    NullChecks.emplace_back(&I, GEP->getPointerOperand());
+                } else if (auto *Load = dyn_cast<LoadInst>(&I)) {
+                    NullChecks.emplace_back(&I, Load->getPointerOperand());
+                } else if (auto *Store = dyn_cast<StoreInst>(&I)) {
+                    NullChecks.emplace_back(&I, Store->getPointerOperand());
+                }
+            }
+
+            auto *Call = dyn_cast<CallBase>(&I);
+            Function *Callee = Call ? Call->getCalledFunction() : nullptr;
+            if (!Callee || !PointerSinks.count(Callee->getName())) {
+                continue;
+            }
+
+            for (unsigned ArgIndex = 0; ArgIndex < Call->arg_size(); ++ArgIndex) {
+                if (Call->getArgOperand(ArgIndex)->getType()->isPointerTy()) {
+                    SinkArguments.emplace_back(Call, ArgIndex);
+                    break;
+                }
+            }
+        }
+    }
+
+    for (auto [InsertBefore, Address] : NullChecks) {
+        Builder.SetInsertPoint(InsertBefore);
+        Value *CastAddress = Builder.CreateBitCast(
+            Address, PointerType::get(Type::getInt8Ty(M->getContext()), 0));
+        Builder.CreateCall(CheckNullPtrFunc, {CastAddress});
+        Modified = true;
+    }
+
     /* 루프/비루프 구분 없이 모든 GEP에 대해 GEP 직후에 compare_tag 삽입.
      * 기존 루프 전용 경로는 ExitBlock predecessor에서 GEP를 찾으려 했으나,
      * GEP가 루프 바디 BB에만 존재하고 다른 predecessor에는 없어 항상
@@ -203,6 +270,10 @@ PreservedAnalyses PointerArithmeticPass::run(Function &F, FunctionAnalysisManage
     for (auto &BB : F) {
         for (auto &I : BB) {
             if (auto *GEP = dyn_cast<GetElementPtrInst>(&I)) {
+                if (isa<StructType>(GEP->getSourceElementType())) {
+                    continue;
+                }
+
                 Builder.SetInsertPoint(GEP->getNextNode());
                 Value *Addr1 = GEP->getPointerOperand();
                 Value *Addr2 = GEP;
@@ -217,6 +288,15 @@ PreservedAnalyses PointerArithmeticPass::run(Function &F, FunctionAnalysisManage
         }
     }
 
+    for (auto [Call, ArgIndex] : SinkArguments) {
+        Builder.SetInsertPoint(Call);
+        Value *Address = Builder.CreateBitCast(
+            Call->getArgOperand(ArgIndex),
+            PointerType::get(Type::getInt8Ty(M->getContext()), 0));
+        Builder.CreateCall(CheckLiveTagFunc, {Address});
+        Modified = true;
+    }
+
     return (Modified ? PreservedAnalyses::none() : PreservedAnalyses::all());
 }
 
@@ -225,9 +305,10 @@ PreservedAnalyses StructMetadataPass::run(Module &M, ModuleAnalysisManager &AM) 
     LLVMContext &Context = M.getContext();
     bool Modified = false;
 
-    // 전역 배열로 저장할 메타데이터들
-    std::vector<std::vector<Constant *>> offsetsArray;
-    std::vector<std::vector<Constant *>> sizesArray;
+    // 전역 배열로 저장할 메타데이터들.
+    // runtime/set_struct_tags()는 offsets/sizes를 flat 배열로 소비한다.
+    std::vector<Constant *> offsetsArray;
+    std::vector<Constant *> sizesArray;
     std::vector<Constant *> countsArray;
     
 
@@ -256,52 +337,38 @@ PreservedAnalyses StructMetadataPass::run(Module &M, ModuleAnalysisManager &AM) 
         errs()<<"\n";
 
         countsArray.push_back(ConstantInt::get(Type::getInt32Ty(Context), numMembers));
-        offsetsArray.push_back(offsets);
-        sizesArray.push_back(sizes);
+        offsetsArray.insert(offsetsArray.end(), offsets.begin(), offsets.end());
+        sizesArray.insert(sizesArray.end(), sizes.begin(), sizes.end());
 
-        
+
     }
-     
-        
+
+
     // 전역 배열로 모듈에 추가
-    if(!offsetsArray.empty()){
-        // 모든 구조체 중 최대 멤버 수를 구해 inner 배열 타입을 통일
-        size_t maxMembers = 0;
-        for (size_t i = 0; i < offsetsArray.size(); ++i)
-            if (offsetsArray[i].size() > maxMembers)
-                maxMembers = offsetsArray[i].size();
-
-        ArrayType *innerArrayType = ArrayType::get(Type::getInt32Ty(Context), maxMembers);
+    if(!countsArray.empty()){
         Constant *zero = ConstantInt::get(Type::getInt32Ty(Context), 0);
-
-        std::vector<Constant *> offsetsGlobalArray;
-        std::vector<Constant *> sizesGlobalArray;
-
-        for (size_t i = 0; i < offsetsArray.size(); ++i) {
-            std::vector<Constant *> paddedOffsets = offsetsArray[i];
-            std::vector<Constant *> paddedSizes = sizesArray[i];
-            while (paddedOffsets.size() < maxMembers) paddedOffsets.push_back(zero);
-            while (paddedSizes.size() < maxMembers) paddedSizes.push_back(zero);
-
-            offsetsGlobalArray.push_back(ConstantArray::get(innerArrayType, paddedOffsets));
-            sizesGlobalArray.push_back(ConstantArray::get(innerArrayType, paddedSizes));
+        if (offsetsArray.empty()) {
+            offsetsArray.push_back(zero);
+            sizesArray.push_back(zero);
         }
 
-        ArrayType *outerArrayType = ArrayType::get(innerArrayType, offsetsGlobalArray.size());
+        ArrayType *offsetsType = ArrayType::get(Type::getInt32Ty(Context), offsetsArray.size());
+        ArrayType *sizesType = ArrayType::get(Type::getInt32Ty(Context), sizesArray.size());
+        ArrayType *countsType = ArrayType::get(Type::getInt32Ty(Context), countsArray.size());
 
-        new GlobalVariable(M, outerArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(outerArrayType, offsetsGlobalArray), "struct_member_offsets");
-        new GlobalVariable(M, outerArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(outerArrayType, sizesGlobalArray), "struct_member_sizes");
-        new GlobalVariable(M, ArrayType::get(Type::getInt32Ty(Context), countsArray.size()), true, GlobalValue::ExternalLinkage, ConstantArray::get(ArrayType::get(Type::getInt32Ty(Context), countsArray.size()), countsArray), "struct_member_counts");
+        new GlobalVariable(M, offsetsType, true, GlobalValue::ExternalLinkage, ConstantArray::get(offsetsType, offsetsArray), "struct_member_offsets");
+        new GlobalVariable(M, sizesType, true, GlobalValue::ExternalLinkage, ConstantArray::get(sizesType, sizesArray), "struct_member_sizes");
+        new GlobalVariable(M, countsType, true, GlobalValue::ExternalLinkage, ConstantArray::get(countsType, countsArray), "struct_member_counts");
 
    }
    else{
-   
-        ArrayType *emptyArrayType = ArrayType::get(PointerType::get(Type::getInt8Ty(M.getContext()), 0), 0);
-        new GlobalVariable(M, emptyArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(emptyArrayType, {}), "struct_member_offsets");
-        new GlobalVariable(M, emptyArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(emptyArrayType, {}), "struct_member_sizes");
+        Constant *zero = ConstantInt::get(Type::getInt32Ty(Context), 0);
+        ArrayType *emptyArrayType = ArrayType::get(Type::getInt32Ty(Context), 1);
+        new GlobalVariable(M, emptyArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(emptyArrayType, {zero}), "struct_member_offsets");
+        new GlobalVariable(M, emptyArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(emptyArrayType, {zero}), "struct_member_sizes");
 
-        ArrayType *emptyCountArrayType = ArrayType::get(Type::getInt32Ty(Context), 0);
-        new GlobalVariable(M, emptyCountArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(emptyCountArrayType, {}), "struct_member_counts");
+        ArrayType *emptyCountArrayType = ArrayType::get(Type::getInt32Ty(Context), 1);
+        new GlobalVariable(M, emptyCountArrayType, true, GlobalValue::ExternalLinkage, ConstantArray::get(emptyCountArrayType, {zero}), "struct_member_counts");
     }
 
        // StructMetadataIndexMap을 Module에 메타데이터로 저장

@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include "runtimeConfig.h"
 #include "tagManager.h"
 
@@ -22,3 +23,7 @@ void MPU_ConfigureRegion(uint32_t region_num, uint32_t enable, uint32_t base_add
 void heap_reset(void);
 /* Peak heap bytes allocated since last heap_reset() */
 size_t heap_get_peak(void);
+void* my_malloc(size_t size);
+void* my_calloc(size_t nmemb, size_t size);
+void* my_realloc(void* ptr, size_t size);
+void my_free(void* ptr);

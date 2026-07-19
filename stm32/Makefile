@@ -137,6 +137,10 @@ C_DEFS =  \
 -DUSE_HAL_DRIVER \
 -DSTM32L562xx
 
+ifeq ($(BENCHMARK_MODE),1)
+C_DEFS += -DBENCHMARK_MODE
+endif
+
 
 # AS includes
 AS_INCLUDES = 
@@ -159,12 +163,15 @@ CFLAGS += $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction
 TARGET_TRIPLE = arm-none-eabi
 GCC_ARM_PATH = /usr
 GCC_SYSROOT = /usr/lib/arm-none-eabi
-LLVM_FLAGS = -O2 -emit-llvm -S --target=$(TARGET_TRIPLE) $(MCU) $(C_DEFS) $(C_INCLUDES)
-LLVM_FLAGS += --sysroot=$(GCC_SYSROOT) --gcc-toolchain=$(GCC_ARM_PATH) -Wall -fdata-sections -ffunction-sections -fno-inline -fno-elide-constructors
+LLVM_COMMON_FLAGS = -emit-llvm -S --target=$(TARGET_TRIPLE) $(MCU) $(C_DEFS) $(C_INCLUDES)
+LLVM_COMMON_FLAGS += --sysroot=$(GCC_SYSROOT) --gcc-toolchain=$(GCC_ARM_PATH) -Wall -fdata-sections -ffunction-sections -fno-inline -fno-elide-constructors
+LLVM_FLAGS = -O2 $(LLVM_COMMON_FLAGS)
+APPLICATION_LLVM_FLAGS = -O0 -Xclang -disable-O0-optnone $(LLVM_COMMON_FLAGS)
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -gdwarf-2
-LLVM_FLAGS += -gdwarf-2  -g 
+LLVM_FLAGS += -gdwarf-2  -g
+APPLICATION_LLVM_FLAGS += -gdwarf-2  -g
 endif
 
 
@@ -258,13 +265,17 @@ APPLICATION_C_SOURCES := $(foreach f,$(APPLICATION_C_SOURCES),$(if $(findstring 
 APPLICATION_C_SOURCES := $(foreach f,$(APPLICATION_C_SOURCES),$(if $(findstring file_,$(f)),,$(f)))
 
 APPLICATION_LL_FILES = $(addprefix $(APPLICATION_BUILD_DIR)/, $(notdir $(APPLICATION_C_SOURCES:.c=.ll)))
-APPLICATION_FLAGS = -Dmalloc=my_malloc -Dfree=my_free \
+ifeq ($(NATIVE_BASELINE),1)
+APPLICATION_FLAGS =
+else
+APPLICATION_FLAGS = -Dmalloc=my_malloc -Dcalloc=my_calloc -Drealloc=my_realloc -Dfree=my_free \
                    -Dmemcpy=my_memcpy -Dmemset=my_memset -Dmemmove=my_memmove \
                    -Dstrcpy=my_strcpy -Dstrncpy=my_strncpy \
-                   -Dstrcat=my_strcat -Dstrncat=my_strncat \
-                   -Dwcscpy=my_wcscpy -Dwcsncpy=my_wcsncpy -Dwcscat=my_wcscat \
+                   -Dstrcat=my_strcat -Dstrncat=my_strncat -Dsnprintf=my_snprintf \
+                   -Dwcscpy=my_wcscpy -Dwcsncpy=my_wcsncpy -Dwcscat=my_wcscat -Dwcsncat=my_wcsncat -Dswprintf=my_swprintf \
                    -Dwmemcpy=my_wmemcpy -Dwmemmove=my_wmemmove \
                    -Dexit=my_exit
+endif
 # default action: build all
 all: $(LL_FILE) $(APPLICATION_LL_FILE)
 direct: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin
@@ -292,11 +303,11 @@ $(info APPLICATION_OBJECTS: $(APPLICATION_OBJECTS))
 # $(LL_FILE): $(C_SOURCES)| $(BUILD_DIR)
 # 	$(LLVM_CC)  $(LLVM_FLAGS) $< -o $@
 
-$(BUILD_DIR)/%.ll: %.c Makefile | $(BUILD_DIR) 
+$(BUILD_DIR)/%.ll: %.c Makefile | $(BUILD_DIR)
 	$(LLVM_CC) $(LLVM_FLAGS) -emit-llvm -c $< -o $@
 
-$(APPLICATION_BUILD_DIR)/%.ll: %.c Makefile | $(APPLICATION_BUILD_DIR) 
-	$(LLVM_CC) $(LLVM_FLAGS) -emit-llvm $(APPLICATION_FLAGS) -c $< -o $@
+$(APPLICATION_BUILD_DIR)/%.ll: %.c Makefile | $(APPLICATION_BUILD_DIR)
+	$(LLVM_CC) $(APPLICATION_LLVM_FLAGS) -emit-llvm $(APPLICATION_FLAGS) -c $< -o $@
 
 # 모든 .ll 파일을 링크하여 output.ll 생성
 $(LL_FILE): $(LL_FILES)

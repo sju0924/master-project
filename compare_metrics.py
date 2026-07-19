@@ -19,6 +19,8 @@ compare_metrics.py — PASS firmware vs NO_PASS firmware 성능 비교
   python3 compare_metrics.py --firmware-dir firmware/
 """
 
+from __future__ import annotations
+
 import re
 import sys
 import argparse
@@ -37,7 +39,10 @@ def parse_log(path: str) -> dict:
     current_name = None
     with open(path, encoding="utf-8", errors="replace") as f:
         for line in f:
-            m = re.search(r'\[(PASS|FAIL\S*)\]\s+(.*)', line)
+            m = re.search(
+                r'\[(PASS|FAIL(?:-MISS|-FP|-BOTH)?)\s*\]\s+(.*)',
+                line,
+            )
             if m:
                 current_name = m.group(2).strip()
 

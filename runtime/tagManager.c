@@ -17,7 +17,7 @@ uint8_t tag_generator(){
     while(tag == prev_tag || tag == 0x00 || tag == UNPOISON_TAG || tag == POISON_TAG){
         tag = rand() % 0xFF;
     }
-    
+
     prev_tag = tag;
 
     return tag;
@@ -34,139 +34,129 @@ uint8_t* get_tag_address(void* address) {
 void set_tag(void *address, size_t size) {
     uint8_t *tag_address;
     char buffer[100];
+    if(size == 0){
+        return;
+    }
+
     if(tag_address = get_tag_address(address)){
         uint8_t tag = tag_generator();
-        
-        // 8바이트 단위로 태그 설정
-        for (size_t i = 0; i < size / 8; i++) {
-            *tag_address = tag;
-            tag_address++;
-        }
+        uintptr_t end_address = (uintptr_t)address + size - 1;
+        uint8_t *tag_end = get_tag_address((void*)end_address);
 
-        // 남은 바이트가 있을 경우 마지막 태그 설정
-        if (size % 8 != 0) {
-            *tag_address = tag;
+        while (tag_end && tag_address <= tag_end) {
+            *tag_address++ = tag;
         }
 
         #ifdef DEBUG
         snprintf(buffer, sizeof(buffer), "Tag assigned at: %p, size: %d tag: %u", address, size, tag);
         uart_debug_print(buffer);
         #endif
-    }   
+    }
 
-    
+
 }
 
 void remove_tag(void *address, size_t size) {
     uint8_t *tag_address;
     char buffer[100];
+    if(size == 0){
+        return;
+    }
+
     if(tag_address = get_tag_address(address)){
         uint8_t tag = UNPOISON_TAG;
-        
-        // 8바이트 단위로 태그 설정
-        for (size_t i = 0; i < size / 8; i++) {
+        uintptr_t end_address = (uintptr_t)address + size - 1;
+        uint8_t *tag_end = get_tag_address((void*)end_address);
+
+        while (tag_end && tag_address <= tag_end) {
             *tag_address++ = tag;
         }
 
-        // 남은 바이트가 있을 경우 마지막 태그 설정
-        if (size % 8 != 0) {
-            *tag_address = tag;
-        }
 
-        
-    }   
+    }
     #ifdef DEBUG
     snprintf(buffer, sizeof(buffer), "Tag removed at: %p, size: %d tag: %u", address, size, UNPOISON_TAG);
     uart_debug_print(buffer);
     #endif
 
-    
+
 }
 
 void set_tag_padding(void *address, size_t size) {
     uint8_t *tag_address;
+    if(size == 0){
+        return;
+    }
+
     if(tag_address = get_tag_address(address)){
         uint8_t padding_tag = 0x00;
-        
-        // 8바이트 단위로 태그 설정
-        for (size_t i = 0; i < size / 8; i++) {
-            *tag_address++ = padding_tag;
-        }
+        uintptr_t end_address = (uintptr_t)address + size - 1;
+        uint8_t *tag_end = get_tag_address((void*)end_address);
 
-        // 남은 바이트가 있을 경우 마지막 태그 설정
-        if (size % 8 != 0) {
-            *tag_address = padding_tag;
+        while (tag_end && tag_address <= tag_end) {
+            *tag_address++ = padding_tag;
         }
     }
 }
 
-// 8바이트 경계마다 태그를 다르게 설정하는 함수
+// 구조체 필드마다 태그를 설정하는 함수
 void set_struct_tags(void *struct_address, uint32_t item_index) {
     char buffer[100];
     uint32_t index = 0;
-    // 인덱스 불러오기
-    for(int i = 0 ; i<item_index ; i++){
+
+    // flat metadata 배열에서 item_index 구조체의 첫 멤버 위치 계산
+    for(uint32_t i = 0 ; i < item_index ; i++){
         index += struct_member_counts[i];
     }
 
     // 구조체 메타데이터 불러오기
-    uint32_t* member_offsets = (uint32_t*)(struct_member_offsets + index);
-    uint32_t* member_sizes = (uint32_t*)(struct_member_sizes + index);
-    uint32_t num_members = struct_member_counts[index];
+    uint32_t* member_offsets = struct_member_offsets + index;
+    uint32_t* member_sizes = struct_member_sizes + index;
+    uint32_t num_members = struct_member_counts[item_index];
 
-    // 분석에 필요한 멤버 변수 설정
     uintptr_t base_address = (uintptr_t)struct_address;
-    uintptr_t last_tagged_address = base_address; 
-
-    uint32_t current_address  = 0;
-    uint8_t current_tag = 0;
-    uint8_t *tag_address;
-
 
     #ifdef DEBUG
     if(num_members){//debug
         snprintf(buffer, sizeof(buffer), "Tag metadata size: %zu, base address: %p\n", num_members, base_address + member_offsets[0]);
-        uart_debug_print(buffer);   
+        uart_debug_print(buffer);
         snprintf(buffer, sizeof(buffer), "Address of tables: offset: %p, size: %p\n", member_offsets, member_sizes);
-        uart_debug_print(buffer);  
+        uart_debug_print(buffer);
         snprintf(buffer, sizeof(buffer), "Second element of member_offsets: %zu, size: %zu\n", member_offsets[1], member_sizes[1]);
-        uart_debug_print(buffer);  
+        uart_debug_print(buffer);
     }
     #endif
-     
+
     for (uint32_t i = 0; i < num_members; i++) {
         uintptr_t member_address = base_address + member_offsets[i];
         uint32_t member_size = (uint32_t)member_sizes[i];
+        if (member_size == 0) {
+            continue;
+        }
+
+        uintptr_t member_end = member_address + member_size - 1;
 
         #ifdef DEBUG
         snprintf(buffer, sizeof(buffer), "Member address: %d, member size: %zu\n", member_address, member_size);
         uart_debug_print(buffer);
         #endif
 
-        if (member_address < RAM_START || member_address>= RAM_END) {
+        if (member_address < RAM_START || member_end >= RAM_END) {
             continue; // 유효하지 않은 태그 주소는 무시
         }
 
-        // 만약 객체의 끝 부분이 8바이트로 나누어 떨어질 시 태그 부여
-        if(member_offsets[i] % 8 == 0 ){
-            current_address = last_tagged_address;
-            current_tag = tag_generator();
+        uint8_t current_tag = tag_generator();
+        uint8_t *tag_address = get_tag_address((void*)member_address);
+        uint8_t *tag_end = get_tag_address((void*)member_end);
 
-            // 이전 객체에 대한 태그 설정
-            while(current_address <= member_address){
-                tag_address = get_tag_address((void*)current_address);
-                *tag_address = current_tag;
-                current_address += 8;
-            }
-
-            last_tagged_address = current_address;
-
-            // 디버그 출력 (각 멤버별 태그 정보)
-            #ifdef DEBUG
-            snprintf(buffer, sizeof(buffer), "Tag assigned: %u\n",  current_tag);
-            uart_debug_print(buffer);
-            #endif
+        while (tag_address && tag_end && tag_address <= tag_end) {
+            *tag_address++ = current_tag;
         }
+
+        #ifdef DEBUG
+        snprintf(buffer, sizeof(buffer), "Tag assigned: %u\n",  current_tag);
+        uart_debug_print(buffer);
+        #endif
 
     }
 }
@@ -180,9 +170,17 @@ uint8_t get_tag(void *address) {
     return tag;
 }
 
+void check_live_tag(void *address) {
+    uint8_t *tag_address = get_tag_address(address);
+
+    if (tag_address && *tag_address == UNPOISON_TAG) {
+        handle_tag_mismatch(address, address);
+    }
+}
+
 // 두 주소의 태그를 비교하는 함수
 uint8_t compare_tag(void* addr1, void* addr2) {
-    
+
     char buffer[100];
 
     uint8_t* tag1 = get_tag_address(addr1);

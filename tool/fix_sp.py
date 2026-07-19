@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+import argparse
+import re
+
+
+SP_ADJUST_RE = re.compile(r"\b(?:sub|add)\s+sp,\s*#72\b")
+
+
 def move_app_blocks(input_file, output_file):
     # 파일 읽기
     with open(input_file, 'r') as file:
@@ -11,18 +19,14 @@ def move_app_blocks(input_file, output_file):
 
     # 블록 탐색: @APP, sub sp, #72, @NO_APP
     while i < len(lines) - 2:  # 최소 3줄은 있어야 블록으로 간주
-        if "@APP" in lines[i] and "sub	sp, #72" in lines[i + 1] and "@NO_APP" in lines[i + 2]:
+        if "@APP" in lines[i] and SP_ADJUST_RE.search(lines[i + 1]) and "@NO_APP" in lines[i + 2]:
     
-            blocks.append((i, i + 2))  # 블록 시작과 끝 줄 번호 저장
-            i += 3  # 블록의 끝까지 건너뛰기
-        elif "@APP" in lines[i] and "add	sp, #72" in lines[i + 1] and "@NO_APP" in lines[i + 2]:
-       
             blocks.append((i, i + 2))  # 블록 시작과 끝 줄 번호 저장
             i += 3  # 블록의 끝까지 건너뛰기
         else:
             i += 1
-            
-        if ".file" in lines [i]:
+
+        if i < len(lines) and ".file" in lines[i]:
             lines[i] = lines[i].replace('" "','')
 
     # 각 블록을 가장 가까운 bl 명령어 위로 이동
@@ -51,8 +55,16 @@ def move_app_blocks(input_file, output_file):
     with open(output_file, 'w') as file:
         file.writelines(lines)
 
-# 실행
-input_file = 'output.s'  # 원본 파일
-output_file = 'fixed_output.s'  # 수정된 파일
 
-move_app_blocks(input_file, output_file)
+def main():
+    parser = argparse.ArgumentParser(
+        description="Move stack spacing inline asm blocks next to the call they protect."
+    )
+    parser.add_argument("input", nargs="?", default="output.s")
+    parser.add_argument("output", nargs="?", default="fixed_output.s")
+    args = parser.parse_args()
+    move_app_blocks(args.input, args.output)
+
+
+if __name__ == "__main__":
+    main()

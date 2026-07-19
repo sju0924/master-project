@@ -71,8 +71,20 @@ static void fault_recover_body(uint32_t *frame, uint32_t exc_return) {
         frame += 18;
     }
 
+    if (g_detection_source == DETECTION_NONE) {
+        g_detection_source =
+            (SCB->CFSR & 0xFFU) != 0U ? DETECTION_MPU : DETECTION_CPU_FAULT;
+        g_detection_cycles = DWT->CYCCNT - g_detection_start_cycle;
+    }
     HAL_MPU_Disable();
     g_error_detected = 1;
+    g_last_fault_phase = (uint32_t)g_test_phase;
+    g_last_fault_pc = frame[6];
+    g_last_fault_lr = frame[5];
+    g_last_fault_cfsr = SCB->CFSR;
+    g_last_fault_hfsr = SCB->HFSR;
+    g_last_fault_mmfar = SCB->MMFAR;
+    g_last_fault_bfar = SCB->BFAR;
 
     /* Clear HardFault status (harmless when called from MemManage) */
     SCB->HFSR = SCB->HFSR;
@@ -87,6 +99,10 @@ static void fault_recover_body(uint32_t *frame, uint32_t exc_return) {
 void MemManage_Handler_C(uint32_t *frame, uint32_t exc_return) {
     HAL_MPU_Disable();
     if (!g_test_running) { while (1); }
+    if (g_detection_source == DETECTION_NONE) {
+        g_detection_source = DETECTION_MPU;
+        g_detection_cycles = DWT->CYCCNT - g_detection_start_cycle;
+    }
     fault_recover_body(frame, exc_return);
 }
 

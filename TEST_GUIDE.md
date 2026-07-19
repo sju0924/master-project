@@ -68,13 +68,13 @@ cmake --build build/runtime -- -j$(nproc)
 cd ~/master-project
 
 # 단일 CWE (처음 테스트 시 권장)
-./build_per_cwe.sh CWE121 s01
+./build_per_cwe.sh CWE121_Stack_Based_Buffer_Overflow s01
 
 # 전체 빌드
 ./build_per_cwe.sh
 ```
 
-산출물: `firmware/firmware_CWE121_s01.elf` / `.bin`
+산출물: `firmware/firmware_CWE121_Stack_Based_Buffer_Overflow_s01.elf` / `.bin`
 
 ---
 
@@ -83,13 +83,13 @@ cd ~/master-project
 `NO_PASS=1` 환경변수를 설정하면 opt-18 패스 단계를 건너뛰고 원본 IR 그대로 컴파일합니다.
 
 ```bash
-NO_PASS=1 ./build_per_cwe.sh CWE121 s01
+NO_PASS=1 ./build_per_cwe.sh CWE121_Stack_Based_Buffer_Overflow s01
 
 # 전체
 NO_PASS=1 ./build_per_cwe.sh
 ```
 
-산출물: `firmware/firmware_CWE121_s01_nopass.elf` / `.bin`
+산출물: `firmware/firmware_CWE121_Stack_Based_Buffer_Overflow_s01_nopass.elf` / `.bin`
 
 ---
 
@@ -100,8 +100,8 @@ NO_PASS=1 ./build_per_cwe.sh
 ```bash
 # 단일 쌍
 python3 compare_metrics.py \
-  --pass-elf   firmware/firmware_CWE121_s01.elf \
-  --nopass-elf firmware/firmware_CWE121_s01_nopass.elf
+  --pass-elf   firmware/firmware_CWE121_Stack_Based_Buffer_Overflow_s01.elf \
+  --nopass-elf firmware/firmware_CWE121_Stack_Based_Buffer_Overflow_s01_nopass.elf
 
 # firmware/ 디렉토리 전체 자동 매칭
 python3 compare_metrics.py --firmware-dir firmware/
@@ -114,13 +114,14 @@ python3 compare_metrics.py --firmware-dir firmware/
 ```bash
 # 플래시
 STM32_Programmer_CLI -c port=SWD \
-  -w firmware/firmware_CWE121_s01.bin 0x08000000 -rst
+  -w firmware/firmware_CWE121_Stack_Based_Buffer_Overflow_s01.bin 0x08000000 -rst
 
 # UART 로그 수집 (보드 리셋 직후 자동 시작됨)
 python3 capture_uart.py /dev/ttyUSB0 with_pass.log
 ```
 
-`capture_uart.py`가 없는 경우 (테스트 완료 후 수동 Ctrl+C):
+pyserial이 설치되지 않은 환경에서는 다음 명령으로 수동 수집할 수 있습니다
+(테스트 완료 후 Ctrl+C).
 ```bash
 stty -F /dev/ttyUSB0 115200 raw
 cat /dev/ttyUSB0 | tee with_pass.log
@@ -132,7 +133,7 @@ cat /dev/ttyUSB0 | tee with_pass.log
 
 ```bash
 STM32_Programmer_CLI -c port=SWD \
-  -w firmware/firmware_CWE121_s01_nopass.bin 0x08000000 -rst
+  -w firmware/firmware_CWE121_Stack_Based_Buffer_Overflow_s01_nopass.bin 0x08000000 -rst
 
 python3 capture_uart.py /dev/ttyUSB0 no_pass.log
 ```
@@ -145,8 +146,8 @@ python3 capture_uart.py /dev/ttyUSB0 no_pass.log
 python3 compare_metrics.py \
   --pass-log   with_pass.log \
   --nopass-log no_pass.log \
-  --pass-elf   firmware/firmware_CWE121_s01.elf \
-  --nopass-elf firmware/firmware_CWE121_s01_nopass.elf
+  --pass-elf   firmware/firmware_CWE121_Stack_Based_Buffer_Overflow_s01.elf \
+  --nopass-elf firmware/firmware_CWE121_Stack_Based_Buffer_Overflow_s01_nopass.elf
 ```
 
 출력 예시:

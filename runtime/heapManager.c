@@ -12,6 +12,11 @@ static size_t s_heap_peak = 0;  /* peak bytes since last reset */
 
 size_t heap_get_peak(void) { return s_heap_peak; }
 
+static size_t heap_alloc_size(void *ptr) {
+    HeapMetadata* metadata = (HeapMetadata*)(((uintptr_t)ptr - REDZONE_SIZE/2 - sizeof(HeapMetadata)) & ~(4 - 1));
+    return metadata->size;
+}
+
 /* Free all outstanding allocations – called by test runner after each case */
 void heap_reset(void) {
     while (heap_track_count > 0) {
@@ -173,4 +178,37 @@ void my_free(void* ptr) {
 
     // 전체 메모리 블록 해제
     free(metadata->raw_ptr);  // 메타데이터에 저장된 실제 시작 주소로 전체 블록 해제
+}
+
+void* my_calloc(size_t nmemb, size_t size) {
+    if (nmemb != 0 && size > SIZE_MAX / nmemb) {
+        return NULL;
+    }
+
+    size_t total = nmemb * size;
+    void *ptr = my_malloc(total);
+    if (ptr) {
+        memset(ptr, 0, total);
+    }
+    return ptr;
+}
+
+void* my_realloc(void* ptr, size_t size) {
+    if (!ptr) {
+        return my_malloc(size);
+    }
+    if (size == 0) {
+        my_free(ptr);
+        return NULL;
+    }
+
+    size_t old_size = heap_alloc_size(ptr);
+    void *new_ptr = my_malloc(size);
+    if (!new_ptr) {
+        return NULL;
+    }
+
+    memcpy(new_ptr, ptr, old_size < size ? old_size : size);
+    my_free(ptr);
+    return new_ptr;
 }
